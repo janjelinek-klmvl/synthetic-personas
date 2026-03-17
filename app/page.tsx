@@ -1,101 +1,177 @@
-import Image from "next/image";
+'use client'
+
+import { useState } from 'react'
+import IdeaInput from '@/components/IdeaInput'
+import PersonaSelector from '@/components/PersonaSelector'
+import TestTypeSelector from '@/components/TestTypeSelector'
+import RunTestButton from '@/components/RunTestButton'
+import ReportSection from '@/components/ReportSection'
+import AppHeader from '@/components/AppHeader'
+import { TestReport } from '@/lib/types'
+import { saveEntry } from '@/lib/history'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [ideaText,          setIdeaText]          = useState('')
+  const [fileContent,       setFileContent]       = useState<string | undefined>()
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null)
+  const [selectedTestTypeId,setSelectedTestTypeId]= useState<string | null>(null)
+  const [loading,           setLoading]           = useState(false)
+  const [report,            setReport]            = useState<TestReport | null>(null)
+  const [error,             setError]             = useState<string | null>(null)
+  const [validationErrors,  setValidationErrors]  = useState<string[]>([])
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+  const canRun = ideaText.trim().length >= 20 && selectedPersonaId !== null && selectedTestTypeId !== null
+
+  const validate = (): boolean => {
+    const errors: string[] = []
+    if (ideaText.trim().length < 20) errors.push('idea')
+    if (!selectedPersonaId)          errors.push('persona')
+    if (!selectedTestTypeId)         errors.push('testType')
+    setValidationErrors(errors)
+    return errors.length === 0
+  }
+
+  const handleRun = async () => {
+    if (!validate()) return
+    setLoading(true)
+    setReport(null)
+    setError(null)
+    try {
+      const res  = await fetch('/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ideaText:   ideaText.trim(),
+          fileContent,
+          personaId:  selectedPersonaId,
+          testType:   selectedTestTypeId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error ?? 'An unexpected error occurred.')
+      } else {
+        setReport(data.report)
+        // Auto-save to history
+        saveEntry({
+          personaId:  selectedPersonaId!,
+          testTypeId: selectedTestTypeId!,
+          ideaText:   ideaText.trim(),
+          report:     data.report,
+        })
+      }
+    } catch {
+      setError('Network error — please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const hasError = (field: string) => validationErrors.includes(field)
+
+  return (
+    <div className="min-h-screen" style={{ background: 'var(--surface)' }}>
+
+      <AppHeader />
+
+      {/* Hero */}
+      <div className="max-w-2xl mx-auto px-6 pt-14 pb-12">
+        <div className="tag tag-blue mb-5" style={{ width: 'fit-content' }}>AI-powered personas</div>
+        <h1 style={{
+          fontSize: 'clamp(36px, 6vw, 52px)',
+          fontWeight: 800,
+          lineHeight: 1.1,
+          letterSpacing: '-0.025em',
+          color: 'var(--text-primary)',
+          marginBottom: '16px',
+        }}>
+          How does your idea<br />land in the real world?
+        </h1>
+        <p style={{ fontSize: '17px', lineHeight: 1.6, color: 'var(--text-secondary)', maxWidth: '440px' }}>
+          Pick a customer archetype, describe your idea, and get a structured reaction — as if you ran a focus group.
+        </p>
+      </div>
+
+      {/* Form */}
+      <div className="max-w-2xl mx-auto px-6">
+
+        {/* Step 01 — Choose a persona */}
+        <section style={{ paddingBottom: '48px', marginBottom: '48px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '28px' }}>
+            <span className="label-caps" style={{ color: 'var(--text-tertiary)' }}>01</span>
+            <h2 style={{
+              fontSize: '22px', fontWeight: 700, letterSpacing: '-0.015em',
+              color: hasError('persona') ? 'var(--orange)' : 'var(--text-primary)',
+            }}>
+              Choose a persona
+            </h2>
+          </div>
+          <PersonaSelector
+            selectedId={selectedPersonaId}
+            onSelect={id => {
+              setSelectedPersonaId(id)
+              setValidationErrors(e => e.filter(x => x !== 'persona'))
+            }}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+        </section>
+
+        {/* Step 02 — Describe your idea */}
+        <section style={{ paddingBottom: '48px', marginBottom: '48px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '28px' }}>
+            <span className="label-caps" style={{ color: 'var(--text-tertiary)' }}>02</span>
+            <h2 style={{
+              fontSize: '22px', fontWeight: 700, letterSpacing: '-0.015em',
+              color: hasError('idea') ? 'var(--orange)' : 'var(--text-primary)',
+            }}>
+              Describe your idea
+            </h2>
+          </div>
+          <IdeaInput
+            value={ideaText}
+            onChange={text => {
+              setIdeaText(text)
+              if (hasError('idea') && text.trim().length >= 20)
+                setValidationErrors(e => e.filter(x => x !== 'idea'))
+            }}
+            fileContent={fileContent}
+            onFileContent={(content, _name) => setFileContent(content)}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+        </section>
+
+        {/* Step 03 — What do you want to measure? */}
+        <section style={{ paddingBottom: '48px', marginBottom: '48px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '28px' }}>
+            <span className="label-caps" style={{ color: 'var(--text-tertiary)' }}>03</span>
+            <h2 style={{
+              fontSize: '22px', fontWeight: 700, letterSpacing: '-0.015em',
+              color: hasError('testType') ? 'var(--orange)' : 'var(--text-primary)',
+            }}>
+              What do you want to measure?
+            </h2>
+          </div>
+          <TestTypeSelector
+            selectedId={selectedTestTypeId}
+            onSelect={id => {
+              setSelectedTestTypeId(id)
+              setValidationErrors(e => e.filter(x => x !== 'testType'))
+            }}
           />
-          Go to nextjs.org →
-        </a>
+        </section>
+
+        {/* Run */}
+        <section style={{ paddingBottom: '48px' }}>
+          <RunTestButton loading={loading} disabled={!canRun} onClick={handleRun} />
+        </section>
+
+      </div>
+
+      {/* Report */}
+      <ReportSection report={report} loading={loading} testTypeId={selectedTestTypeId} error={error} />
+
+      <footer className="max-w-2xl mx-auto px-6 py-10" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: '32px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Powered by Claude — reactions are simulated, not real.</p>
       </footer>
+
     </div>
-  );
+  )
 }
