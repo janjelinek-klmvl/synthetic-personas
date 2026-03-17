@@ -22,7 +22,7 @@ export default function HistoryPage() {
     if (selected?.id === id) setSelected(null)
   }
 
-  const usedPersonaIds = [...new Set(entries.map(e => e.personaId))]
+  const usedPersonaIds = Array.from(new Set(entries.map(e => e.personaId)))
 
   const filtered = entries.filter(e => {
     if (filterType !== 'all' && e.testTypeId !== filterType) return false
