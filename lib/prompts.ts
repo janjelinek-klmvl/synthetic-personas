@@ -1,4 +1,4 @@
-import { Persona } from './types'
+import { Persona, TestContext, IdeaType, PROPOSITION_PARAMS, CAMPAIGN_PARAMS } from './types'
 
 export function buildSystemPrompt(persona: Persona): string {
   const drivers = persona.decisionDrivers.map((d) => `• ${d}`).join('\n')
@@ -25,12 +25,61 @@ RESPONSE FORMAT:
 Return valid JSON only. No markdown fences. No preamble. No explanation outside the JSON.`
 }
 
+function ideaTypeLabel(ideaType: IdeaType): string {
+  switch (ideaType) {
+    case 'proposition': return 'Product Proposition'
+    case 'campaign':    return 'Marketing Campaign'
+  }
+}
+
+const BRIEF_LABELS: Record<string, string> = {
+  // Proposition
+  problem:         'Problem',
+  solution:        'Solution',
+  offer:           'Offer',
+  coreBenefit:     'Core benefit',
+  differentiator:  'Differentiator',
+  contextOfUse:    'Context of use',
+  adoptionBarrier: 'Adoption barrier',
+  revenueModel:    'Revenue model',
+  // Campaign
+  mainMessage:     'Main message',
+  rtbs:            'RTBs',
+  differentiation: 'Differentiation',
+  emotionalImpact: 'Emotional impact',
+  insight:         'Insight',
+  cta:             'CTA / pay-off',
+}
+
+function buildContextSection(context: TestContext): string {
+  const brief = context.brief
+  if (!brief) return ''
+
+  const params = context.ideaType === 'proposition'
+    ? (PROPOSITION_PARAMS as readonly string[])
+    : (CAMPAIGN_PARAMS as readonly string[])
+
+  const title = context.ideaType === 'proposition'
+    ? 'PRODUCT PROPOSITION BRIEF'
+    : 'MARKETING CAMPAIGN BRIEF'
+
+  const lines = params
+    .filter(p => brief[p])
+    .map(p => `${(BRIEF_LABELS[p] ?? p).padEnd(18)} ${brief[p]}`)
+
+  if (!lines.length) return ''
+  return `\n\n${title}\n${'─'.repeat(26)}\n${lines.join('\n')}`
+}
+
 export function buildUserPrompt(
   ideaText: string,
   fileContent: string | undefined,
-  testTypeId: string
+  context: TestContext,
+  testTypeId: 'qualitative' | 'quantitative'
 ): string {
-  let prompt = `IDEA / PROPOSITION:\n${ideaText}`
+  let prompt = `IDEA TYPE: ${ideaTypeLabel(context.ideaType)}\n\nIDEA / PROPOSITION:\n${ideaText}`
+
+  prompt += buildContextSection(context)
 
   if (fileContent && fileContent.trim()) {
     prompt += `\n\nADDITIONAL CONTEXT FROM UPLOADED DOCUMENT:\n${fileContent}`

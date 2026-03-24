@@ -1,21 +1,29 @@
-import { TestReport } from './types'
+import { CombinedTestReport, IdeaType, HistoryEntry } from './types'
 
-export interface HistoryEntry {
-  id:         string
-  createdAt:  string   // ISO
-  personaId:  string
-  testTypeId: string
-  ideaText:   string
-  report:     TestReport
-}
+export type { HistoryEntry }
 
 const KEY = 'sp-history'
+
+function normalizeEntry(e: unknown): HistoryEntry {
+  const entry = e as Record<string, unknown>
+  // Migrate legacy single-persona entries
+  if ('personaId' in entry && !('personaIds' in entry)) {
+    entry.personaIds = [entry.personaId]
+    delete entry.personaId
+  }
+  if ('report' in entry && !('reports' in entry)) {
+    entry.reports = [entry.report]
+    delete entry.report
+  }
+  return entry as unknown as HistoryEntry
+}
 
 export function loadHistory(): HistoryEntry[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as HistoryEntry[]) : []
+    const parsed = raw ? (JSON.parse(raw) as unknown[]) : []
+    return parsed.map(normalizeEntry)
   } catch {
     return []
   }
@@ -50,4 +58,37 @@ export function formatRelativeTime(iso: string): string {
   if (hours < 24) return `${hours}h ago`
   if (days  < 7)  return `${days}d ago`
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+// Helper: get display score from a single combined report (uses qual score as primary)
+export function getDisplayScore(report: CombinedTestReport): { value: number | null; max: number } {
+  if (report.qualReport?.overallScore != null) {
+    return { value: report.qualReport.overallScore, max: 10 }
+  }
+  if (report.quantReport?.compositeScore != null) {
+    return { value: report.quantReport.compositeScore, max: 100 }
+  }
+  return { value: null, max: 10 }
+}
+
+// Helper: get average display score across multiple reports
+export function getDisplayScoreMulti(reports: CombinedTestReport[]): { value: number | null; max: number } {
+  if (reports.length === 0) return { value: null, max: 10 }
+  if (reports.length === 1) return getDisplayScore(reports[0])
+  const qualScores = reports.map(r => r.qualReport?.overallScore).filter((s): s is number => s != null)
+  if (qualScores.length > 0) {
+    return { value: Math.round(qualScores.reduce((a, b) => a + b, 0) / qualScores.length), max: 10 }
+  }
+  const quantScores = reports.map(r => r.quantReport?.compositeScore).filter((s): s is number => s != null)
+  if (quantScores.length > 0) {
+    return { value: Math.round(quantScores.reduce((a, b) => a + b, 0) / quantScores.length), max: 100 }
+  }
+  return { value: null, max: 10 }
+}
+
+export function ideaTypeLabel(ideaType: IdeaType): string {
+  switch (ideaType) {
+    case 'proposition': return 'Proposition'
+    case 'campaign':    return 'Campaign'
+  }
 }

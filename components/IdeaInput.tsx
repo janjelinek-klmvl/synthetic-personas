@@ -7,10 +7,12 @@ interface Props {
   value: string
   onChange: (text: string) => void
   fileContent: string | undefined
-  onFileContent: (content: string | undefined, fileName: string | undefined) => void
+  onFileContent: (content: string | undefined, fileName?: string | undefined) => void
+  /** When true, renders only the file upload + button (no textarea) */
+  toolbarOnly?: boolean
 }
 
-export default function IdeaInput({ value, onChange, fileContent, onFileContent }: Props) {
+export default function IdeaInput({ value, onChange, fileContent, onFileContent, toolbarOnly }: Props) {
   const [fileName, setFileName] = useState<string | undefined>()
   const [extracting, setExtracting] = useState(false)
   const [fileError, setFileError] = useState<string | undefined>()
@@ -59,6 +61,60 @@ export default function IdeaInput({ value, onChange, fileContent, onFileContent 
     setFileName(undefined)
     setFileError(undefined)
     onFileContent(undefined, undefined)
+  }
+
+  // ── Toolbar-only mode (just file upload button) ─────────────
+  if (toolbarOnly) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input ref={fileInputRef} type="file" accept=".txt,.pdf,.doc,.docx" onChange={handleFileInput} className="hidden" />
+        {fileContent ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>
+              <path d="M8 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6L8 1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M8 1v5h5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+            </svg>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              {fileContent.split(/\s+/).length.toLocaleString()}w
+            </span>
+            <button
+              type="button"
+              onClick={removeFile}
+              style={{
+                width: '16px', height: '16px', borderRadius: '9999px',
+                background: 'var(--border)', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-secondary)', fontSize: '11px', lineHeight: 1, padding: 0,
+              }}
+            >×</button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach file (.txt, .pdf, .docx)"
+            style={{
+              width: '30px', height: '30px', borderRadius: '50%',
+              border: '1.5px solid #d1d1d1', background: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#888', flexShrink: 0,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#1a1a1a'; (e.currentTarget as HTMLElement).style.color = '#1a1a1a' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#d1d1d1'; (e.currentTarget as HTMLElement).style.color = '#888' }}
+          >
+            {extracting ? (
+              <div style={{ width: '10px', height: '10px', border: '1.5px solid #888', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+        )}
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
   }
 
   return (

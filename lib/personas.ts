@@ -1,5 +1,14 @@
 import { Persona } from './types'
 
+export const accentMap: Record<string, { avatarBg: string; avatarText: string }> = {
+  amber:  { avatarBg: '#FFF3D6', avatarText: '#8A6200' },
+  violet: { avatarBg: '#E8DEFF', avatarText: '#6B3ECC' },
+  cyan:   { avatarBg: '#D6E4FD', avatarText: '#2E63E0' },
+  green:  { avatarBg: '#D4EDD4', avatarText: '#2A6A2A' },
+  indigo: { avatarBg: '#D9DCFF', avatarText: '#3D52C4' },
+  rose:   { avatarBg: '#FFD6E0', avatarText: '#C4335A' },
+}
+
 export const personas: Persona[] = [
   {
     id: 'budget-millennial',

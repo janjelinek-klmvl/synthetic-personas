@@ -340,6 +340,41 @@
   }
 }
 
+/* ─── Responsive layout containers ──────────────────────────── */
+.container-xl  { width: 100%; max-width: 1280px; margin: 0 auto; padding-left: 40px;  padding-right: 40px;  }
+.container-lg  { width: 100%; max-width:  960px; margin: 0 auto; padding-left: 32px;  padding-right: 32px;  }
+.container-md  { width: 100%; max-width:  720px; margin: 0 auto; padding-left: 24px;  padding-right: 24px;  }
+.container-sm  { width: 100%; max-width:  560px; margin: 0 auto; padding-left: 24px;  padding-right: 24px;  }
+
+@media (max-width: 768px) {
+  .container-xl, .container-lg { padding-left: 20px; padding-right: 20px; }
+  .container-md, .container-sm { padding-left: 16px; padding-right: 16px; }
+}
+
+/* Two-column results split (qual / quant) */
+.col-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .col-split { grid-template-columns: 1fr 1fr; }
+}
+
+/* History card grid */
+.history-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 768px) {
+  .history-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+@media (min-width: 1280px) {
+  .history-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
+
 /* ─── Utilities ──────────────────────────────────────────────── */
 @layer utilities {
   .text-balance     { text-wrap: balance; }

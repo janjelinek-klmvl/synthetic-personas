@@ -3,12 +3,7 @@
 import { useEffect, useState } from 'react'
 import { TestReport } from '@/lib/types'
 
-interface Props {
-  report: TestReport
-  testTypeId: string
-}
-
-// ── Qualitative ──────────────────────────────────────────────
+// ── Qualitative score bar ─────────────────────────────────────
 function ScoreBar({ value, delay = 0 }: { value: number; delay?: number }) {
   const [width, setWidth] = useState(0)
   useEffect(() => {
@@ -35,65 +30,69 @@ function ScoreBar({ value, delay = 0 }: { value: number; delay?: number }) {
   )
 }
 
-function QualitativeScore({ report }: { report: TestReport }) {
-  const score = report.overallScore ?? 0
-  const scoreColor = score >= 7 ? 'var(--primary)' : score >= 4 ? 'var(--yellow)' : 'var(--orange)'
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', marginBottom: '20px' }}>
-        <span style={{ fontSize: '128px', fontWeight: 800, lineHeight: 1, letterSpacing: '-0.05em', color: scoreColor }}>
-          {score}
-        </span>
-        <span style={{ fontSize: '36px', fontWeight: 400, color: 'var(--text-tertiary)', marginBottom: '16px' }}>/10</span>
-      </div>
-      {report.summary && (
-        <p style={{
-          fontSize: '24px', fontWeight: 500, lineHeight: 1.4,
-          color: 'var(--text-primary)', letterSpacing: '-0.02em',
-          marginBottom: '32px', paddingLeft: '24px',
-          borderLeft: '3px solid var(--primary)',
-        }}>
-          &ldquo;{report.summary}&rdquo;
-        </p>
-      )}
-      <div style={{ paddingTop: '24px', borderTop: '1px solid var(--border-subtle)' }}>
-        <ScoreBar value={score} delay={200} />
-      </div>
-    </div>
-  )
+// ── Combined dual scores ──────────────────────────────────────
+interface DualScoreProps {
+  qualReport: TestReport
+  quantReport: TestReport
 }
 
-// ── Quantitative ─────────────────────────────────────────────
-function CompositeScore({ report }: { report: TestReport }) {
-  const score = report.compositeScore ?? 0
-  const scoreColor = score >= 70 ? 'var(--primary)' : score >= 45 ? 'var(--yellow)' : 'var(--orange)'
+export default function ScoreCard({ qualReport, quantReport }: DualScoreProps) {
+  const qualScore  = qualReport.overallScore ?? 0
+  const quantScore = quantReport.compositeScore ?? 0
+
+  const qualColor  = qualScore >= 7  ? 'var(--primary)' : qualScore >= 4  ? 'var(--yellow)' : 'var(--orange)'
+  const quantColor = quantScore >= 70 ? 'var(--primary)' : quantScore >= 45 ? 'var(--yellow)' : 'var(--orange)'
 
   return (
-    <div>
-      <div className="label-caps" style={{ color: 'var(--text-tertiary)', marginBottom: '16px' }}>
-        Composite Score
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+
+      {/* Qualitative score */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="label-caps" style={{ color: 'var(--text-tertiary)' }}>
+          Sentiment
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+          <span style={{ fontSize: '80px', fontWeight: 800, lineHeight: 1, letterSpacing: '-0.05em', color: qualColor }}>
+            {qualScore}
+          </span>
+          <span style={{ fontSize: '28px', fontWeight: 400, color: 'var(--text-tertiary)', marginBottom: '10px' }}>/10</span>
+        </div>
+        {qualReport.summary && (
+          <p style={{
+            fontSize: '16px', fontWeight: 500, lineHeight: 1.5,
+            color: 'var(--text-primary)', letterSpacing: '-0.01em',
+            paddingLeft: '14px', borderLeft: '2px solid var(--primary)',
+          }}>
+            &ldquo;{qualReport.summary}&rdquo;
+          </p>
+        )}
+        <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+          <ScoreBar value={qualScore} delay={200} />
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', marginBottom: '28px' }}>
-        <span style={{ fontSize: '128px', fontWeight: 800, lineHeight: 1, letterSpacing: '-0.05em', color: scoreColor }}>
-          {score}
-        </span>
-        <span style={{ fontSize: '40px', fontWeight: 400, color: 'var(--text-tertiary)', marginBottom: '18px' }}>%</span>
+
+      {/* Quantitative score */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="label-caps" style={{ color: 'var(--text-tertiary)' }}>
+          Concept Score
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px' }}>
+          <span style={{ fontSize: '80px', fontWeight: 800, lineHeight: 1, letterSpacing: '-0.05em', color: quantColor }}>
+            {quantScore}
+          </span>
+          <span style={{ fontSize: '28px', fontWeight: 400, color: 'var(--text-tertiary)', marginBottom: '10px' }}>%</span>
+        </div>
+        {quantReport.verdict && (
+          <p style={{
+            fontSize: '16px', fontWeight: 500, lineHeight: 1.5,
+            color: 'var(--text-primary)', letterSpacing: '-0.01em',
+            paddingLeft: '14px', borderLeft: '2px solid var(--primary)',
+          }}>
+            &ldquo;{quantReport.verdict}&rdquo;
+          </p>
+        )}
       </div>
-      {report.verdict && (
-        <p style={{
-          fontSize: '24px', fontWeight: 500, lineHeight: 1.4,
-          color: 'var(--text-primary)', letterSpacing: '-0.02em',
-          paddingLeft: '24px', borderLeft: '3px solid var(--primary)',
-        }}>
-          &ldquo;{report.verdict}&rdquo;
-        </p>
-      )}
+
     </div>
   )
-}
-
-export default function ScoreCard({ report, testTypeId }: Props) {
-  if (testTypeId === 'quantitative') return <CompositeScore report={report} />
-  return <QualitativeScore report={report} />
 }

@@ -1,11 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getPersonaById } from '@/lib/personas'
-import { getTestTypeById } from '@/lib/testTypes'
 import { buildSystemPrompt, buildUserPrompt } from '@/lib/prompts'
-import { TestRequest } from '@/lib/types'
+import { TestRequest, TestReport, CombinedTestReport } from '@/lib/types'
 
 const client = new Anthropic()
+
+async function callClaude(
+  systemPrompt: string,
+  userPrompt: string,
+  personaId: string,
+  testType: 'qualitative' | 'quantitative'
+): Promise<TestReport> {
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 3000,
+    temperature: 0.7,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  })
+
+  const rawContent = message.content[0]
+  if (rawContent.type !== 'text') {
+    throw new Error('Unexpected response format from AI.')
+  }
+
+  const cleaned = rawContent.text
+    .replace(/^```(?:json)?\n?/i, '')
+    .replace(/\n?```$/i, '')
+    .trim()
+
+  const report = JSON.parse(cleaned) as TestReport
+  report.personaId = personaId
+  return report
+}
 
 export async function POST(req: NextRequest) {
   let body: TestRequest
@@ -15,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { ideaText, fileContent, personaId, testType: testTypeId } = body
+  const { ideaText, fileContent, personaIds, context } = body
 
   // Validation
   if (!ideaText || ideaText.trim().length < 20) {
@@ -25,49 +53,34 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const persona = getPersonaById(personaId)
-  if (!persona) {
-    return NextResponse.json({ error: 'Invalid persona selected.' }, { status: 400 })
+  if (!Array.isArray(personaIds) || personaIds.length === 0) {
+    return NextResponse.json({ error: 'At least one persona is required.' }, { status: 400 })
   }
 
-  const testType = getTestTypeById(testTypeId)
-  if (!testType) {
-    return NextResponse.json({ error: 'Invalid test type selected.' }, { status: 400 })
+  if (!context?.ideaType) {
+    return NextResponse.json({ error: 'Idea type is required.' }, { status: 400 })
   }
 
-  const systemPrompt = buildSystemPrompt(persona)
-  const userPrompt = buildUserPrompt(ideaText, fileContent, testTypeId)
+  // Resolve all personas upfront
+  const resolvedPersonas = personaIds.map(id => getPersonaById(id)).filter(Boolean) as NonNullable<ReturnType<typeof getPersonaById>>[]
+  if (resolvedPersonas.length === 0) {
+    return NextResponse.json({ error: 'No valid personas found.' }, { status: 400 })
+  }
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
-      temperature: 0.7,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
-
-    const rawContent = message.content[0]
-    if (rawContent.type !== 'text') {
-      return NextResponse.json({ error: 'Unexpected response format from AI.' }, { status: 500 })
+    // Process personas sequentially to stay within API rate limits.
+    // Qual + quant for each persona still run in parallel (2 concurrent calls max).
+    const reports: CombinedTestReport[] = []
+    for (const persona of resolvedPersonas) {
+      const systemPrompt = buildSystemPrompt(persona)
+      const [qualReport, quantReport] = await Promise.all([
+        callClaude(systemPrompt, buildUserPrompt(ideaText, fileContent, context, 'qualitative'), persona.id, 'qualitative'),
+        callClaude(systemPrompt, buildUserPrompt(ideaText, fileContent, context, 'quantitative'), persona.id, 'quantitative'),
+      ])
+      reports.push({ personaId: persona.id, ideaType: context.ideaType, qualReport, quantReport })
     }
 
-    let report
-    try {
-      // Strip any accidental markdown fences just in case
-      const cleaned = rawContent.text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
-      report = JSON.parse(cleaned)
-    } catch {
-      return NextResponse.json(
-        { error: 'Failed to parse AI response. Please try again.' },
-        { status: 500 }
-      )
-    }
-
-    // Ensure personaId is set correctly
-    report.personaId = personaId
-
-    return NextResponse.json({ report })
+    return NextResponse.json({ reports })
   } catch (err: unknown) {
     console.error('Anthropic API error:', err)
     const message = err instanceof Error ? err.message : 'Unknown error'

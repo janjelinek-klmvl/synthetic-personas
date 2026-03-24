@@ -81,14 +81,66 @@ export interface TestReport {
   }
 }
 
+// ── New types for 3-stage flow ────────────────────────
+
+export type IdeaType = 'proposition' | 'campaign'
+
+// ── Brief parameter frameworks ────────────────────────
+
+export const PROPOSITION_PARAMS = [
+  'problem', 'solution', 'offer', 'coreBenefit',
+  'differentiator', 'contextOfUse', 'adoptionBarrier', 'revenueModel',
+] as const
+
+export const CAMPAIGN_PARAMS = [
+  'mainMessage', 'rtbs', 'differentiation', 'emotionalImpact', 'insight', 'cta',
+] as const
+
+export type IdeaBrief = Record<string, string | null>
+
+// ── Stage 2: brief questions ──────────────────────────
+
+export interface BriefQuestion {
+  id: string
+  parameter: string       // which IdeaBrief key this fills
+  question: string
+  type: 'text' | 'choice'
+  choices?: string[]
+  hint?: string
+}
+
+export interface TestContext {
+  ideaType: IdeaType
+  brief?: IdeaBrief       // structured brief built from Stage 2
+}
+
+export interface CombinedTestReport {
+  personaId: string
+  ideaType: IdeaType
+  qualReport: TestReport
+  quantReport: TestReport
+}
+
 export interface TestRequest {
   ideaText: string
   fileContent?: string
-  personaId: string
-  testType: string
+  personaIds: string[]          // supports 1 or many personas
+  context: TestContext
 }
 
 export interface TestResponse {
-  report?: TestReport
+  reports?: CombinedTestReport[]
   error?: string
+}
+
+// ── History ───────────────────────────────────────────
+
+export interface HistoryEntry {
+  id: string
+  createdAt: string
+  personaIds: string[]              // was: personaId (singular)
+  ideaType: IdeaType
+  ideaText: string
+  context: TestContext
+  reports: CombinedTestReport[]     // was: report (singular)
 }

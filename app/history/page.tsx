@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import AppHeader from '@/components/AppHeader'
 import ReportDrawer from '@/components/ReportDrawer'
-import { loadHistory, deleteEntry, HistoryEntry, formatRelativeTime } from '@/lib/history'
-import { getPersonaById } from '@/lib/personas'
+import { loadHistory, deleteEntry, formatRelativeTime, ideaTypeLabel, getDisplayScoreMulti, HistoryEntry } from '@/lib/history'
+import { getPersonaById, accentMap } from '@/lib/personas'
+import { IdeaType } from '@/lib/types'
 
 export default function HistoryPage() {
   const [entries,       setEntries]       = useState<HistoryEntry[]>([])
-  const [filterType,    setFilterType]    = useState('all')
   const [filterPersona, setFilterPersona] = useState('all')
+  const [filterType,    setFilterType]    = useState<IdeaType | 'all'>('all')
   const [selected,      setSelected]      = useState<HistoryEntry | null>(null)
 
   useEffect(() => { setEntries(loadHistory()) }, [])
@@ -22,11 +23,11 @@ export default function HistoryPage() {
     if (selected?.id === id) setSelected(null)
   }
 
-  const usedPersonaIds = Array.from(new Set(entries.map(e => e.personaId)))
+  const usedPersonaIds = Array.from(new Set(entries.flatMap(e => e.personaIds)))
 
   const filtered = entries.filter(e => {
-    if (filterType !== 'all' && e.testTypeId !== filterType) return false
-    if (filterPersona !== 'all' && e.personaId !== filterPersona) return false
+    if (filterType !== 'all' && e.ideaType !== filterType) return false
+    if (filterPersona !== 'all' && !e.personaIds.includes(filterPersona)) return false
     return true
   })
 
@@ -34,7 +35,7 @@ export default function HistoryPage() {
     <div className="min-h-screen" style={{ background: 'var(--surface)' }}>
       <AppHeader />
 
-      <div className="max-w-2xl mx-auto px-6 pt-12 pb-24">
+      <div className="container-xl pt-12 pb-24">
 
         {/* Page heading */}
         <div style={{ marginBottom: '32px' }}>
@@ -63,7 +64,7 @@ export default function HistoryPage() {
               No tests yet
             </div>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', marginBottom: '28px' }}>
-              Run your first idea test and it'll show up here automatically.
+              Run your first idea test and it&apos;ll show up here automatically.
             </p>
             <Link href="/" style={{
               display: 'inline-flex', alignItems: 'center',
@@ -80,13 +81,13 @@ export default function HistoryPage() {
             {/* ── Filters ──────────────────────────────────── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
 
-              {/* Test type pills */}
+              {/* Idea type pills */}
               <div style={{ display: 'flex', gap: '6px' }}>
-                {[
-                  { id: 'all',          label: 'All' },
-                  { id: 'qualitative',  label: 'General Feedback' },
-                  { id: 'quantitative', label: 'Concept Validation' },
-                ].map(f => (
+                {([
+                  { id: 'all',         label: 'All' },
+                  { id: 'proposition', label: 'Proposition' },
+                  { id: 'campaign',    label: 'Campaign' },
+                ] as { id: IdeaType | 'all'; label: string }[]).map(f => (
                   <button
                     key={f.id}
                     onClick={() => setFilterType(f.id)}
@@ -155,7 +156,7 @@ export default function HistoryPage() {
                 No results match this filter.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="history-grid">
                 {filtered.map(entry => (
                   <HistoryCard
                     key={entry.id}
@@ -187,14 +188,16 @@ function HistoryCard({
 }) {
   const [hovered, setHovered] = useState(false)
 
-  const persona  = getPersonaById(entry.personaId)
-  const isQual   = entry.testTypeId === 'qualitative'
-  const score    = isQual ? entry.report.overallScore : entry.report.compositeScore
-  const scoreStr = score != null ? (isQual ? `${score}/10` : `${score}%`) : '—'
+  const isMulti = entry.personaIds.length > 1
+  const firstPersona = getPersonaById(entry.personaIds[0])
+
+  const { value: score, max } = getDisplayScoreMulti(entry.reports)
+  const scoreStr = score != null ? (max === 10 ? `${score}/10` : `${score}%`) : '—'
   const scoreColor =
-    isQual
-      ? (score ?? 0) >= 7 ? '#10B981' : (score ?? 0) >= 5 ? '#F59E0B' : '#EF4444'
-      : (score ?? 0) >= 70 ? '#10B981' : (score ?? 0) >= 50 ? '#F59E0B' : '#EF4444'
+    score == null ? 'var(--text-disabled)' :
+    max === 10
+      ? score >= 7 ? '#10B981' : score >= 5 ? '#F59E0B' : '#EF4444'
+      : score >= 70 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444'
 
   return (
     <div
@@ -213,31 +216,52 @@ function HistoryCard({
         position: 'relative',
       }}
     >
-      {/* Persona emoji */}
-      {persona && (
+      {/* Avatar — single or stacked */}
+      {isMulti ? (
+        <div style={{ display: 'flex', flexShrink: 0 }}>
+          {entry.personaIds.slice(0, 4).map((pid, i) => {
+            const p = getPersonaById(pid)
+            const accent = accentMap[p?.accentColor ?? 'indigo'] ?? accentMap.indigo
+            return (
+              <div key={pid} style={{
+                width: '34px', height: '34px', borderRadius: '10px',
+                background: accent.avatarBg, color: accent.avatarText,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '16px', border: '2px solid #fff',
+                marginLeft: i === 0 ? 0 : '-8px',
+                position: 'relative', zIndex: entry.personaIds.length - i,
+              }}>
+                {p?.emoji ?? '?'}
+              </div>
+            )
+          })}
+        </div>
+      ) : firstPersona ? (
         <div style={{
           width: '42px', height: '42px', borderRadius: '12px',
           background: 'var(--primary-light)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '20px', flexShrink: 0,
         }}>
-          {persona.emoji}
+          {firstPersona.emoji}
         </div>
-      )}
+      ) : null}
 
       {/* Text */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {persona?.name ?? entry.personaId}
+            {isMulti
+              ? `${entry.personaIds.length} personas`
+              : (firstPersona?.name ?? entry.personaIds[0])
+            }
           </span>
           <span style={{
             fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em',
             textTransform: 'uppercase', padding: '2px 7px', borderRadius: '999px',
-            background: isQual ? 'var(--primary-light)' : 'var(--yellow-light)',
-            color:      isQual ? 'var(--primary)' : '#8A6200',
+            background: '#f0f0f0', color: '#666',
           }}>
-            {isQual ? 'Qualitative' : 'Quantitative'}
+            {ideaTypeLabel(entry.ideaType)}
           </span>
         </div>
         <p style={{
@@ -261,6 +285,11 @@ function HistoryCard({
         }}>
           {scoreStr}
         </div>
+        {isMulti && score != null && (
+          <div style={{ fontSize: '10px', color: 'var(--text-disabled)', marginTop: '2px' }}>
+            avg
+          </div>
+        )}
       </div>
 
       {/* Delete — appears on hover */}

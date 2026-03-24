@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import { HistoryEntry, formatRelativeTime } from '@/lib/history'
-import { getPersonaById } from '@/lib/personas'
+import { useEffect, useState } from 'react'
+import { HistoryEntry, formatRelativeTime, ideaTypeLabel } from '@/lib/history'
+import { getPersonaById, accentMap } from '@/lib/personas'
 import ReportSection from './ReportSection'
 
 interface Props {
@@ -11,6 +11,12 @@ interface Props {
 }
 
 export default function ReportDrawer({ entry, onClose }: Props) {
+  const [activePersonaId, setActivePersonaId] = useState<string | null>(null)
+
+  // Reset active tab when entry changes
+  useEffect(() => {
+    setActivePersonaId(entry?.personaIds[0] ?? null)
+  }, [entry?.id])
 
   // Escape key
   useEffect(() => {
@@ -27,9 +33,8 @@ export default function ReportDrawer({ entry, onClose }: Props) {
 
   if (!entry) return null
 
-  const persona  = getPersonaById(entry.personaId)
-  const isQual   = entry.testTypeId === 'qualitative'
-  const typeLabel = isQual ? 'General Feedback' : 'Concept Validation'
+  const isMulti = entry.personaIds.length > 1
+  const firstPersona = getPersonaById(entry.personaIds[0])
 
   return (
     <>
@@ -48,7 +53,7 @@ export default function ReportDrawer({ entry, onClose }: Props) {
       {/* Panel */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: 'min(640px, 100vw)',
+        width: 'min(760px, 100vw)',
         background: 'var(--surface)',
         zIndex: 50,
         display: 'flex', flexDirection: 'column',
@@ -64,31 +69,52 @@ export default function ReportDrawer({ entry, onClose }: Props) {
           flexShrink: 0,
           background: 'var(--surface)',
         }}>
-          {/* Persona avatar */}
-          {persona && (
+          {/* Avatar — single or stacked */}
+          {isMulti ? (
+            <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center' }}>
+              {entry.personaIds.slice(0, 4).map((pid, i) => {
+                const p = getPersonaById(pid)
+                const accent = accentMap[p?.accentColor ?? 'indigo'] ?? accentMap.indigo
+                return (
+                  <div key={pid} style={{
+                    width: '36px', height: '36px', borderRadius: '10px',
+                    background: accent.avatarBg, color: accent.avatarText,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '18px', border: '2px solid var(--surface)',
+                    marginLeft: i === 0 ? 0 : '-8px',
+                    position: 'relative', zIndex: entry.personaIds.length - i,
+                  }}>
+                    {p?.emoji ?? '?'}
+                  </div>
+                )
+              })}
+            </div>
+          ) : firstPersona ? (
             <div style={{
               width: '44px', height: '44px', borderRadius: '12px',
               background: 'var(--primary-light)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '22px', flexShrink: 0,
             }}>
-              {persona.emoji}
+              {firstPersona.emoji}
             </div>
-          )}
+          ) : null}
 
           {/* Meta */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {persona?.name ?? entry.personaId}
+                {isMulti
+                  ? `${entry.personaIds.length} personas`
+                  : (firstPersona?.name ?? entry.personaIds[0])
+                }
               </span>
               <span style={{
                 fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em',
                 textTransform: 'uppercase', padding: '2px 8px', borderRadius: '999px',
-                background: isQual ? 'var(--primary-light)' : 'var(--yellow-light)',
-                color: isQual ? 'var(--primary)' : '#8A6200',
+                background: '#f0f0f0', color: '#666',
               }}>
-                {typeLabel}
+                {ideaTypeLabel(entry.ideaType)}
               </span>
               <span style={{ fontSize: '11px', color: 'var(--text-disabled)', marginLeft: 'auto' }}>
                 {formatRelativeTime(entry.createdAt)}
@@ -122,13 +148,16 @@ export default function ReportDrawer({ entry, onClose }: Props) {
         </div>
 
         {/* Scrollable report */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           <ReportSection
-            report={entry.report}
+            reports={entry.reports}
             loading={false}
-            testTypeId={entry.testTypeId}
             error={null}
             disableScroll
+            activePersonaId={activePersonaId}
+            onTabChange={setActivePersonaId}
+            ideaText={entry.ideaText}
+            context={entry.context}
           />
         </div>
       </div>
