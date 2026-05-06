@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import AppHeader from '@/components/AppHeader'
 import IdeaInput from '@/components/IdeaInput'
 import IdeaTypeDropdown from '@/components/IdeaTypeDropdown'
@@ -8,6 +8,8 @@ import PersonaDropdown from '@/components/PersonaDropdown'
 import QuestionStep from '@/components/QuestionStep'
 import SetupSummary from '@/components/SetupSummary'
 import ReportSection from '@/components/ReportSection'
+import BriefLoadingState from '@/components/BriefLoadingState'
+import TestLoadingState from '@/components/TestLoadingState'
 import { CombinedTestReport, IdeaType, TestContext, IdeaBrief, BriefQuestion } from '@/lib/types'
 import { saveEntry } from '@/lib/history'
 
@@ -53,6 +55,26 @@ export default function Home() {
   const [showValidation,   setShowValidation]   = useState(false)
 
   const reportRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = () => {
+      setStage(1)
+      setIdeaText('')
+      setFileContent(undefined)
+      setPersonaIds([])
+      setIdeaType(null)
+      setBrief(FALLBACK_BRIEF)
+      setQuestions([])
+      setQuestionIndex(0)
+      setReports([])
+      setActivePersonaId(null)
+      setError(null)
+      setShowValidation(false)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    window.addEventListener('sp-new-test', handler)
+    return () => window.removeEventListener('sp-new-test', handler)
+  }, [])
 
   const canAdvance = ideaText.trim().length >= 20 && personaIds.length > 0 && ideaType !== null
 
@@ -290,7 +312,7 @@ export default function Home() {
       <div className="min-h-screen" style={{ background: 'var(--surface)' }}>
         <AppHeader />
 
-        <div className="container-sm pt-12 pb-16">
+        <div className="container-lg pt-12 pb-16">
           {/* Back button */}
           <button
             type="button"
@@ -319,23 +341,7 @@ export default function Home() {
           </button>
 
           {questionsLoading ? (
-            /* Loading state */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '18px', height: '18px', borderRadius: '50%',
-                  border: '2px solid #1a1a1a', borderTopColor: 'transparent',
-                  animation: 'spin 0.7s linear infinite', flexShrink: 0,
-                }} />
-                <span style={{ fontSize: '16px', color: '#888' }}>Reading your idea…</span>
-                <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-              </div>
-              {/* Skeleton */}
-              <div style={{ height: '3px', background: '#f0f0f0', borderRadius: '9999px' }} />
-              <div style={{ height: '36px', background: '#f0f0f0', borderRadius: '10px', width: '70%', animation: 'pulse 1.5s ease-in-out infinite' }} />
-              <div style={{ height: '52px', background: '#f0f0f0', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-              <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }`}</style>
-            </div>
+            <BriefLoadingState />
           ) : questions.length > 0 ? (
             /* Question step */
             <QuestionStep
@@ -368,19 +374,7 @@ export default function Home() {
 
       {/* Results */}
       <div ref={reportRef} className="container-xl py-10">
-        {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
-            <div style={{
-              width: '16px', height: '16px', borderRadius: '50%',
-              border: '2px solid var(--primary)', borderTopColor: 'transparent',
-              animation: 'spin 0.7s linear infinite',
-            }} />
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-              Running your test across {personaIds.length} {personaIds.length === 1 ? 'persona' : 'personas'}…
-            </span>
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-          </div>
-        )}
+        {loading && <TestLoadingState personaIds={personaIds} />}
         <ReportSection
           reports={reports}
           loading={loading}
