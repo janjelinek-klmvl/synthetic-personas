@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { IdeaType } from '@/lib/types'
 
 const IDEA_TYPES: { id: IdeaType; label: string; description: string }[] = [
-  { id: 'proposition', label: 'Product proposition', description: 'A new product or service concept' },
-  { id: 'campaign',    label: 'Marketing message',   description: 'A campaign, tagline, or ad concept' },
+  { id: 'insight',     label: 'Insight',             description: 'A human truth or tension to test as a stimulus' },
+  { id: 'proposition', label: 'Product proposition', description: 'A new product, service, or feature concept' },
+  { id: 'campaign',    label: 'Campaign idea',       description: 'A campaign, creative platform, or message' },
 ]
 
 interface Props {

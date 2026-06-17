@@ -37,3 +37,7 @@ next-env.d.ts
 
 # Claude Code internals
 .claude/
+.claire/
+
+# Local JSON store (propositions + runs)
+/data/

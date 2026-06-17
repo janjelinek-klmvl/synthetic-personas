@@ -1,6 +1,6 @@
 'use client'
 
-import { getPersonaById } from '@/lib/personas'
+import { useAudiences } from '@/lib/personas'
 
 interface Props {
   personaIds: string[]
@@ -9,6 +9,7 @@ interface Props {
 }
 
 export default function PersonaTabBar({ personaIds, activeId, onChange }: Props) {
+  const { byId } = useAudiences()
   return (
     <div style={{
       display: 'flex',
@@ -18,8 +19,8 @@ export default function PersonaTabBar({ personaIds, activeId, onChange }: Props)
       marginBottom: '32px',
       borderBottom: '1px solid var(--border-subtle)',
     }}>
-      {personaIds.map(id => {
-        const persona = getPersonaById(id)
+      {personaIds.map((id) => {
+        const audience = byId(id)
         const isActive = id === activeId
         return (
           <button
@@ -44,11 +45,11 @@ export default function PersonaTabBar({ personaIds, activeId, onChange }: Props)
               transition: 'all 0.15s',
               flexShrink: 0,
             }}
-            onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)' }}
-            onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)' }}
+            onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)' }}
           >
-            <span>{persona?.emoji}</span>
-            <span>{persona?.name ?? id}</span>
+            <span>{audience?.emoji ?? '•'}</span>
+            <span>{audience?.name ?? id}</span>
           </button>
         )
       })}

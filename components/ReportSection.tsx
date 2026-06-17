@@ -1,200 +1,172 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { CombinedTestReport, TestContext } from '@/lib/types'
-import { getPersonaById } from '@/lib/personas'
-import ScoreCard from './ScoreCard'
-import MetricGrid from './MetricGrid'
-import RadarChart from './RadarChart'
-import RiskFlag from './RiskFlag'
-import PushOver from './PushOver'
-import CulturalRelevance from './CulturalRelevance'
-import InsightsList from './InsightsList'
-import PersonaNarrative from './PersonaNarrative'
-import IRL from './IRL'
-import Recommendations from './Recommendations'
-import PersonaComparison from './PersonaComparison'
-import PersonaChat from './PersonaChat'
+import { useMemo, useState } from 'react'
+import { useAudiences } from '@/lib/personas'
+import type { RunRecord, PerAudienceState } from '@/lib/store'
+import type { RunResultPayload } from '@/lib/types-as'
+import Debrief from './debrief/Debrief'
+import AudienceOverview from './debrief/AudienceOverview'
+import Cap from '@/components/design/Cap'
+import { SX, FONT, PAGE_W } from '@/lib/design/tokens'
 
 interface Props {
-  reports: CombinedTestReport[]
+  record: RunRecord | null
   loading: boolean
   error: string | null
-  disableScroll?: boolean
-  activePersonaId?: string | null
-  onTabChange?: (id: string) => void
-  ideaText?: string
-  context?: TestContext
 }
 
-function Skeleton() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        {[0, 1].map(col => (
-          <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ width: '80px', height: '16px', background: 'var(--border)', borderRadius: '8px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            <div style={{ width: '120px', height: '72px', background: 'var(--border)', borderRadius: '8px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            <div style={{ width: '100%', height: '14px', background: 'var(--border)', borderRadius: '6px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-          </div>
-        ))}
+// ReportSection — top-level renderer for a completed run.
+// Handles error / loading / multi-audience tab switching. The actual
+// chaptered report is in <Debrief />.
+export default function ReportSection({ record, loading, error }: Props) {
+  const { byId, quantMetrics, qualModules } = useAudiences()
+  const audienceIds = record?.audience_ids ?? []
+  const [activeId, setActiveId] = useState<string | null>(audienceIds[0] ?? null)
+
+  const effectiveActiveId = useMemo(() => {
+    if (activeId && audienceIds.includes(activeId)) return activeId
+    return audienceIds[0] ?? null
+  }, [activeId, audienceIds])
+
+  if (error) {
+    return (
+      <div style={panelStyle}>
+        <Cap color={SX.accent} size={11}>
+          Run failed
+        </Cap>
+        <div style={{ color: SX.soft, fontSize: 13, marginTop: 8, fontFamily: FONT.grotesque }}>{error}</div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        {[0, 1, 2, 3].map(row => (
-          <div key={row} style={{ height: '80px', background: 'var(--border)', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-        ))}
-      </div>
-      <div style={{ background: '#fff', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {[0, 1, 2, 3].map(row => (
-          <div key={row} style={{ height: '14px', background: 'var(--border)', borderRadius: '6px', width: row === 3 ? '55%' : '100%', animation: 'pulse 1.5s ease-in-out infinite' }} />
-        ))}
-      </div>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-    </div>
-  )
-}
+    )
+  }
 
-export default function ReportSection({ reports, loading, error, disableScroll, activePersonaId, onTabChange, ideaText, context }: Props) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [chatOpen, setChatOpen] = useState(false)
+  if (loading || !record) return null
 
-  useEffect(() => {
-    if (disableScroll) return
-    if ((reports.length > 0 || loading) && ref.current) {
-      setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
-    }
-  }, [reports, loading, disableScroll])
-
-  // Close chat when switching persona
-  useEffect(() => { setChatOpen(false) }, [activePersonaId])
-
-  if (reports.length === 0 && !loading && !error) return null
-
-  const isMulti = reports.length > 1
-  const activeReport = isMulti
-    ? (reports.find(r => r.personaId === activePersonaId) ?? reports[0])
-    : (reports[0] ?? null)
-
-  const persona = activeReport ? getPersonaById(activeReport.personaId) : null
-  const qual    = activeReport?.qualReport
-  const quant   = activeReport?.quantReport
+  const activeState: PerAudienceState | undefined = effectiveActiveId
+    ? record.per_audience[effectiveActiveId]
+    : undefined
 
   return (
-    <div ref={ref}>
-
-      {/* Error */}
-      {error && (
-        <div style={{
-          background: '#FFF0EE', border: '1px solid #FFD6CE',
-          borderRadius: '12px', padding: '16px 20px',
-          marginBottom: '32px', fontSize: '14px', color: 'var(--orange)',
-        }}>
-          {error}
-        </div>
+    <div>
+      {audienceIds.length > 1 && effectiveActiveId && (
+        <AudienceOverview
+          record={record}
+          activeId={effectiveActiveId}
+          byId={byId}
+          quantMetrics={quantMetrics}
+          onSelect={setActiveId}
+        />
       )}
 
-      {loading && <Skeleton />}
-
-      {reports.length > 0 && !loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', paddingBottom: '16px' }}>
-
-          {/* ── Multi-persona comparison overview ── */}
-          {isMulti && (
-            <PersonaComparison
-              reports={reports}
-              activePersonaId={activePersonaId ?? reports[0].personaId}
-              onSelectPersona={onTabChange ?? (() => {})}
-            />
-          )}
-
-          {/* ── Active persona report ── */}
-          {activeReport && persona && qual && quant && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '40px', paddingBottom: '16px' }}>
-
-              {/* ── Dual scores — full width ── */}
-              <ScoreCard qualReport={qual} quantReport={quant} />
-
-              {/* ── Two-column split ── */}
-              <div className="col-split">
-
-                {/* Left — Qualitative */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                  {qual.resonates && qual.doesNotResonate && (
-                    <InsightsList resonates={qual.resonates} doesNotResonate={qual.doesNotResonate} />
-                  )}
-                  {qual.quotes && qual.quotes.length > 0 && (
-                    <PersonaNarrative quotes={qual.quotes} />
-                  )}
-                  {qual.irl && <IRL irl={qual.irl} />}
-                  {qual.recommendations && <Recommendations recommendations={qual.recommendations} />}
-                </div>
-
-                {/* Right — Quantitative */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                  {quant.metrics && (
-                    <>
-                      <MetricGrid metrics={quant.metrics} />
-                      <RadarChart metrics={quant.metrics} />
-                      {quant.riskFlag && <RiskFlag riskFlag={quant.riskFlag} />}
-                      {quant.culturalRelevance && (
-                        <CulturalRelevance culturalRelevance={quant.culturalRelevance} />
-                      )}
-                      {quant.pushOver && quant.pushOver.length > 0 && (
-                        <PushOver items={quant.pushOver} />
-                      )}
-                    </>
-                  )}
-                </div>
-
-              </div>
-
-              {/* ── Chat button + panel ── */}
-              {ideaText && context && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {!chatOpen ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setChatOpen(true)}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '8px',
-                          padding: '11px 22px', borderRadius: '999px',
-                          border: '1.5px solid #e5e5e5',
-                          background: '#fff',
-                          color: 'var(--text-primary)',
-                          fontSize: '13px', fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.borderColor = '#1a1a1a'
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)'
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.borderColor = '#e5e5e5'
-                          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)'
-                        }}
-                      >
-                        <span style={{ fontSize: '16px' }}>{persona.emoji}</span>
-                        Ask {persona.name.split(' ')[0]} follow-up questions
-                      </button>
-                    </div>
-                  ) : (
-                    <PersonaChat
-                      persona={persona}
-                      ideaText={ideaText}
-                      context={context}
-                    />
-                  )}
-                </div>
-              )}
-
-            </div>
-          )}
-
-        </div>
+      {effectiveActiveId && activeState && (
+        <AudienceReport
+          spRunId={record.run_id}
+          audienceId={effectiveActiveId}
+          state={activeState}
+          quantMetrics={quantMetrics}
+          qualModules={qualModules}
+        />
       )}
     </div>
   )
+}
+
+function AudienceReport({
+  spRunId,
+  audienceId,
+  state,
+  quantMetrics,
+  qualModules,
+}: {
+  spRunId: string
+  audienceId: string
+  state: PerAudienceState
+  quantMetrics: ReturnType<typeof useAudiences>['quantMetrics']
+  qualModules: ReturnType<typeof useAudiences>['qualModules']
+}) {
+  const { byId } = useAudiences()
+  const audience = byId(audienceId)
+
+  if (state.status === 'queued' || state.status === 'running') {
+    return (
+      <div style={panelStyle}>
+        <Cap color={SX.soft} size={10.5}>
+          {audience?.name ?? audienceId}
+        </Cap>
+        <div style={{ marginTop: 6, color: SX.soft, fontFamily: FONT.grotesque, fontSize: 13 }}>
+          {state.progress_step ? `Running — ${state.progress_step}…` : 'Running…'}
+        </div>
+      </div>
+    )
+  }
+
+  if (state.status === 'failed') {
+    return (
+      <div style={panelStyle}>
+        <Cap color={SX.accent} size={11}>
+          {audience?.name ?? audienceId} · failed
+        </Cap>
+        <div style={{ marginTop: 8, color: SX.soft, fontSize: 13, fontFamily: FONT.grotesque }}>
+          {state.error?.message ?? state.error?.code ?? 'Unknown error'}
+        </div>
+      </div>
+    )
+  }
+
+  const result: RunResultPayload | null | undefined = state.result
+  if (!result) {
+    return (
+      <div style={panelStyle}>
+        <div style={{ fontFamily: FONT.grotesque, fontSize: 14, color: SX.soft }}>
+          {audience?.name ?? audienceId} succeeded but no result body was returned.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Debrief
+      spRunId={spRunId}
+      audienceId={audienceId}
+      audience={audience ?? null}
+      result={result}
+      quantMetrics={quantMetrics}
+      qualModules={qualModules}
+    />
+  )
+}
+
+function StatusPill({ status }: { status?: PerAudienceState['status'] }) {
+  if (!status) return null
+  const colors: Record<PerAudienceState['status'], string> = {
+    queued: SX.soft,
+    running: SX.warn,
+    succeeded: SX.ok,
+    failed: SX.accent,
+  }
+  const c = colors[status]
+  return (
+    <span
+      style={{
+        marginLeft: 6,
+        padding: '2px 7px',
+        border: `1px solid ${c}`,
+        color: c,
+        fontFamily: FONT.grotesque,
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.14em',
+      }}
+    >
+      {status}
+    </span>
+  )
+}
+
+const panelStyle: React.CSSProperties = {
+  background: SX.paper,
+  border: `1px solid ${SX.hair}`,
+  padding: 22,
+  maxWidth: PAGE_W,
+  margin: '0 auto',
 }

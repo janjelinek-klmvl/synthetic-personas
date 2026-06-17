@@ -1,146 +1,91 @@
-export interface Persona {
-  id: string
-  name: string
-  tagline: string
-  emoji: string
-  accentColor: string
-  accentBorder: string
-  accentBg: string
-  traits: string[]
-  demographics: {
-    age: string
-    income?: string
-    location?: string
-  }
-  promptContext: string
-  decisionDrivers: string[]
-  painPoints: string[]
-  tone: string
-}
+// SP-local types. Audience and result shapes live in `types-as.ts`.
+// Per-type field schemas + the renderStimulus() helper live in `stimulus.ts`.
 
-export interface TestType {
-  id: string
-  label: string
-  description: string
-  scoreLabel: string
-  hasScore: boolean
-}
+export type { IdeaType, StimulusFields, FieldDef, FieldKind } from './stimulus'
+import type { IdeaType as IdeaTypeImport, StimulusFields as StimulusFieldsImport } from './stimulus'
 
-export interface QuantitativeMetric {
-  score: number       // 0–100 percentage
-  evaluation: string  // ~20 word evaluation
-}
-
-export interface TestReport {
-  personaId: string
-  testType: 'qualitative' | 'quantitative'
-
-  // ── Qualitative ──────────────────────────────────────
-  overallScore?: number
-  summary?: string
-  resonates?: string[]
-  doesNotResonate?: string[]
-  quotes?: {          // 4 quotes from simulated real people matching the persona
-    text:   string
-    name:   string
-    age:    number
-    gender: string
-    area:   string    // e.g. "big city" | "town" | "village"
-  }[]
-  irl?: {
-    problemSolving:     string[]
-    howAndWhenUsed:     string[]
-    whatWouldStopThem:  string[]
-    lifestyleMatch:     string[]
-  }
-  recommendations?: { title: string; description: string }[]
-
-  // ── Quantitative ─────────────────────────────────────
-  compositeScore?: number   // 0–100 average of all metrics
-  verdict?: string          // one punchy sentence in persona's voice
-  metrics?: {
-    purchaseIntent:        QuantitativeMetric
-    desirability:          QuantitativeMetric
-    uniqueness:            QuantitativeMetric
-    valuePerception:       QuantitativeMetric
-    emotionalResonance:    QuantitativeMetric
-    trustAdoptionBarrier:  QuantitativeMetric
-    relevancy:             QuantitativeMetric
-    brandFit:              QuantitativeMetric
-  }
-  pushOver?: string[]       // 2–3 things that would push them over the line
-  riskFlag?: {
-    metric: string          // which metric is the weakest
-    explanation: string     // why this is dangerous for this persona
-  }
-  culturalRelevance?: {
-    trendiness:               number  // 0–100
-    shareability:             number  // 0–100
-    newsworthiness:           number  // 0–100
-    recommendationLikelihood: number  // 0–100
-  }
-}
-
-// ── New types for 3-stage flow ────────────────────────
-
-export type IdeaType = 'proposition' | 'campaign'
-
-// ── Brief parameter frameworks ────────────────────────
-
-export const PROPOSITION_PARAMS = [
-  'problem', 'solution', 'offer', 'coreBenefit',
-  'differentiator', 'contextOfUse', 'adoptionBarrier', 'revenueModel',
-] as const
-
-export const CAMPAIGN_PARAMS = [
-  'mainMessage', 'rtbs', 'differentiation', 'emotionalImpact', 'insight', 'cta',
-] as const
-
-export type IdeaBrief = Record<string, string | null>
-
-// ── Stage 2: brief questions ──────────────────────────
+/**
+ * Back-compat alias for the brief shape. Now a per-type stimulus container
+ * (strings + string-arrays for list fields).
+ */
+export type IdeaBrief = StimulusFieldsImport
 
 export interface BriefQuestion {
   id: string
-  parameter: string       // which IdeaBrief key this fills
+  parameter: string
   question: string
-  type: 'text' | 'choice'
+  // Design has 4 canonical types. `choice` is a back-compat alias for `single`.
+  type: 'text' | 'list' | 'choice' | 'multi' | 'single'
   choices?: string[]
   hint?: string
 }
 
 export interface TestContext {
-  ideaType: IdeaType
-  brief?: IdeaBrief       // structured brief built from Stage 2
+  ideaType: IdeaTypeImport
+  brief?: IdeaBrief
 }
 
-export interface CombinedTestReport {
-  personaId: string
-  ideaType: IdeaType
-  qualReport: TestReport
-  quantReport: TestReport
+export type BriefErrorCode =
+  | 'NO_BODY'
+  | 'MISSING_FIELDS'
+  | 'EMPTY_CLAUDE_RESPONSE'
+  | 'CLAUDE_ERROR'
+  | 'PARSE_ERROR'
+
+export interface BriefResponse {
+  brief: IdeaBrief
+  questions: BriefQuestion[]
+  generated: boolean
+  error?: BriefErrorCode
 }
 
-export interface TestRequest {
-  ideaText: string
-  fileContent?: string
-  personaIds: string[]          // supports 1 or many personas
-  context: TestContext
-}
+// ── File-drop idea extraction ─────────────────────────────────────────
 
-export interface TestResponse {
-  reports?: CombinedTestReport[]
-  error?: string
-}
-
-// ── History ───────────────────────────────────────────
-
-export interface HistoryEntry {
+export interface ExtractCandidate {
   id: string
-  createdAt: string
-  personaIds: string[]              // was: personaId (singular)
-  ideaType: IdeaType
-  ideaText: string
-  context: TestContext
-  reports: CombinedTestReport[]     // was: report (singular)
+  summary: string
+  source_hint: string
+}
+
+export type ExtractOutcome =
+  | {
+      kind: 'single_idea'
+      idea_text: string
+      idea_type: IdeaTypeImport
+      brief: IdeaBrief
+      confidence: 'high' | 'medium' | 'low'
+      source_hint: string
+    }
+  | {
+      kind: 'multiple_ideas'
+      candidates: ExtractCandidate[]
+    }
+  | {
+      kind: 'ambiguous'
+      partial_idea: string
+      clarifying_questions: BriefQuestion[]
+    }
+  | {
+      kind: 'no_idea_found'
+      reason: string
+    }
+
+export type ExtractIdeaSource =
+  | { kind: 'text'; text: string }
+  | { kind: 'document'; data_b64: string; media_type: 'application/pdf' }
+  | {
+      kind: 'image'
+      data_b64: string
+      media_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+    }
+
+export interface ExtractIdeaRequest {
+  filename: string
+  source: ExtractIdeaSource
+  /** When previous outcome was multiple_ideas, the candidate id picked. */
+  pick?: string
+  /** When previous outcome was ambiguous, the user's answers keyed by question id. */
+  clarifications?: Record<string, string>
+  /** Previous outcome (echoed back so the model has context for resolution). */
+  prior?: ExtractOutcome
 }

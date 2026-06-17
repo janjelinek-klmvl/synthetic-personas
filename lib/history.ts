@@ -1,51 +1,31 @@
-import { CombinedTestReport, IdeaType, HistoryEntry } from './types'
+import type { IdeaType } from './types'
+import type { RunRecord } from './store'
 
-export type { HistoryEntry }
+// HistoryEntry is now a thin alias for RunRecord — history is the server-side
+// list of runs persisted by /api/runs.
+export type HistoryEntry = RunRecord
+export type { RunRecord }
 
-const KEY = 'sp-history'
-
-function normalizeEntry(e: unknown): HistoryEntry {
-  const entry = e as Record<string, unknown>
-  // Migrate legacy single-persona entries
-  if ('personaId' in entry && !('personaIds' in entry)) {
-    entry.personaIds = [entry.personaId]
-    delete entry.personaId
-  }
-  if ('report' in entry && !('reports' in entry)) {
-    entry.reports = [entry.report]
-    delete entry.report
-  }
-  return entry as unknown as HistoryEntry
-}
-
-export function loadHistory(): HistoryEntry[] {
-  if (typeof window === 'undefined') return []
+export async function loadHistory(): Promise<HistoryEntry[]> {
   try {
-    const raw = localStorage.getItem(KEY)
-    const parsed = raw ? (JSON.parse(raw) as unknown[]) : []
-    return parsed.map(normalizeEntry)
+    const res = await fetch('/api/runs', { cache: 'no-store' })
+    if (!res.ok) return []
+    const body = await res.json()
+    return Array.isArray(body.runs) ? body.runs : []
   } catch {
     return []
   }
 }
 
-export function saveEntry(data: Omit<HistoryEntry, 'id' | 'createdAt'>): HistoryEntry {
-  const entry: HistoryEntry = {
-    ...data,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: new Date().toISOString(),
+export async function deleteEntry(id: string): Promise<void> {
+  try {
+    await fetch(`/api/runs/${id}`, { method: 'DELETE' })
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sp-history-updated'))
+    }
+  } catch {
+    /* swallow — UI will re-fetch and show the stale entry as a no-op */
   }
-  const all = loadHistory()
-  localStorage.setItem(KEY, JSON.stringify([entry, ...all]))
-  // Notify same-tab listeners (e.g. header badge)
-  window.dispatchEvent(new CustomEvent('sp-history-updated'))
-  return entry
-}
-
-export function deleteEntry(id: string): void {
-  const all = loadHistory()
-  localStorage.setItem(KEY, JSON.stringify(all.filter(e => e.id !== id)))
-  window.dispatchEvent(new CustomEvent('sp-history-updated'))
 }
 
 export function formatRelativeTime(iso: string): string {
@@ -60,35 +40,24 @@ export function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-// Helper: get display score from a single combined report (uses qual score as primary)
-export function getDisplayScore(report: CombinedTestReport): { value: number | null; max: number } {
-  if (report.qualReport?.overallScore != null) {
-    return { value: report.qualReport.overallScore, max: 10 }
-  }
-  if (report.quantReport?.compositeScore != null) {
-    return { value: report.quantReport.compositeScore, max: 100 }
-  }
-  return { value: null, max: 10 }
-}
-
-// Helper: get average display score across multiple reports
-export function getDisplayScoreMulti(reports: CombinedTestReport[]): { value: number | null; max: number } {
-  if (reports.length === 0) return { value: null, max: 10 }
-  if (reports.length === 1) return getDisplayScore(reports[0])
-  const qualScores = reports.map(r => r.qualReport?.overallScore).filter((s): s is number => s != null)
-  if (qualScores.length > 0) {
-    return { value: Math.round(qualScores.reduce((a, b) => a + b, 0) / qualScores.length), max: 10 }
-  }
-  const quantScores = reports.map(r => r.quantReport?.compositeScore).filter((s): s is number => s != null)
-  if (quantScores.length > 0) {
-    return { value: Math.round(quantScores.reduce((a, b) => a + b, 0) / quantScores.length), max: 100 }
-  }
-  return { value: null, max: 10 }
-}
-
 export function ideaTypeLabel(ideaType: IdeaType): string {
   switch (ideaType) {
+    case 'insight':     return 'Insight'
     case 'proposition': return 'Proposition'
     case 'campaign':    return 'Campaign'
   }
+}
+
+// Aggregate the per-audience succeeded results' first quant score (if any)
+// into a single display number, for the history list.
+export function getDisplayScore(entry: HistoryEntry): { value: number | null; max: number } {
+  const succeeded = Object.values(entry.per_audience).filter((s) => s.status === 'succeeded' && s.result)
+  if (succeeded.length === 0) return { value: null, max: 10 }
+  const allScores: number[] = []
+  for (const s of succeeded) {
+    const scores = Object.values(s.result?.audience_quant_results ?? {}).map((r) => r.score)
+    for (const n of scores) if (typeof n === 'number') allScores.push(n)
+  }
+  if (allScores.length === 0) return { value: null, max: 10 }
+  return { value: Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length), max: 10 }
 }

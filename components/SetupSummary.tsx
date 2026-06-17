@@ -1,8 +1,12 @@
 'use client'
 
 import { TestContext } from '@/lib/types'
-import { personas, accentMap } from '@/lib/personas'
+import { accentMap, useAudiences } from '@/lib/personas'
 import { ideaTypeLabel } from '@/lib/history'
+import { SX, FONT, PAGE_W } from '@/lib/design/tokens'
+import Cap from '@/components/design/Cap'
+import Glyphs from '@/components/design/Glyphs'
+import { BtnGhost } from '@/components/design/Btn'
 
 interface Props {
   ideaText: string
@@ -11,127 +15,182 @@ interface Props {
   onEdit: () => void
 }
 
+// Compact "idea panel" shown at the top of Stage 3.
+// Tint background, square pill audience chip, ink type pill, brief context tags, Edit ghost btn.
 export default function SetupSummary({ ideaText, personaIds, context, onEdit }: Props) {
-  const selectedPersonas = personaIds.map(id => personas.find(p => p.id === id)).filter(Boolean) as typeof personas
+  const { byId } = useAudiences()
+  const selected = personaIds
+    .map(byId)
+    .filter((a): a is NonNullable<ReturnType<typeof byId>> => !!a)
 
-  // Show first 2 filled brief values as context tags
   const contextTags: string[] = Object.values(context.brief ?? {})
-    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .flatMap((v) => {
+      if (typeof v === 'string') return v.trim().length > 0 ? [v] : []
+      if (Array.isArray(v)) return v.map(String).filter((s) => s.trim().length > 0)
+      return []
+    })
     .slice(0, 2)
-    .map(v => v.length > 28 ? v.slice(0, 28) + '…' : v)
+    .map((v) => (v.length > 28 ? v.slice(0, 28) + '…' : v))
 
   return (
-    <div style={{ background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
     <div
-      className="container-xl"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        paddingTop: '14px',
-        paddingBottom: '14px',
-        flexWrap: 'wrap',
+        background: SX.tint,
+        borderBottom: `1px solid ${SX.hair}`,
       }}
     >
-      {/* Single persona */}
-      {selectedPersonas.length === 1 && (() => {
-        const persona = selectedPersonas[0]
-        const accent = accentMap[persona.accentColor] ?? accentMap.indigo
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            <div style={{
-              width: '32px', height: '32px', borderRadius: '8px',
-              background: accent.avatarBg, color: accent.avatarText,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px',
-            }}>
-              {persona.emoji}
-            </div>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#1a1a1a' }}>
-              {persona.name}
-            </span>
-          </div>
-        )
-      })()}
-
-      {/* Multi persona — overlapping stack */}
-      {selectedPersonas.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <div style={{ display: 'flex' }}>
-            {selectedPersonas.slice(0, 4).map((persona, i) => {
-              const accent = accentMap[persona.accentColor] ?? accentMap.indigo
-              return (
-                <div key={persona.id} style={{
-                  width: '28px', height: '28px', borderRadius: '8px',
-                  background: accent.avatarBg, color: accent.avatarText,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', border: '2px solid #fff',
-                  marginLeft: i === 0 ? 0 : '-6px',
-                  zIndex: selectedPersonas.length - i,
-                  position: 'relative',
-                }}>
-                  {persona.emoji}
-                </div>
-              )
-            })}
-          </div>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#1a1a1a' }}>
-            {selectedPersonas.length} personas
-          </span>
-        </div>
-      )}
-
-      {/* Divider */}
-      <div style={{ width: '1px', height: '20px', background: '#e5e5e5', flexShrink: 0 }} />
-
-      {/* Idea type badge */}
-      <span style={{
-        padding: '3px 10px', borderRadius: '12px',
-        background: '#f0f0f0', fontSize: '12px', fontWeight: 500, color: '#666',
-        flexShrink: 0,
-      }}>
-        {ideaTypeLabel(context.ideaType)}
-      </span>
-
-      {/* Idea text snippet */}
-      <span style={{
-        fontSize: '13px', color: '#555', flex: 1,
-        overflow: 'hidden', textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap', minWidth: 0,
-      }}>
-        {ideaText.length > 120 ? ideaText.slice(0, 120) + '…' : ideaText}
-      </span>
-
-      {/* Context tags */}
-      {contextTags.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-          {contextTags.map((tag, i) => (
-            <span key={i} style={{
-              padding: '3px 10px', borderRadius: '12px',
-              background: '#f5f5f5', fontSize: '12px', color: '#888',
-            }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Edit button */}
-      <button
-        type="button"
-        onClick={onEdit}
+      <div
         style={{
-          flexShrink: 0, padding: '6px 14px', borderRadius: '20px',
-          border: '1.5px solid #e5e5e5', background: '#fff',
-          color: '#555', fontSize: '12px', fontWeight: 500,
-          cursor: 'pointer', transition: 'all 0.15s',
+          maxWidth: PAGE_W,
+          margin: '0 auto',
+          padding: '0 48px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          height: 56,
+          overflow: 'hidden',
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#1a1a1a'; (e.currentTarget as HTMLElement).style.color = '#1a1a1a' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#e5e5e5'; (e.currentTarget as HTMLElement).style.color = '#555' }}
       >
-        Edit
-      </button>
-    </div>
+        {/* Glyph mark */}
+        <Glyphs size={14} />
+
+        {/* Audience chip(s) */}
+        {selected.length === 1 && (() => {
+          const audience = selected[0]
+          const accent = accentMap[audience.accentColor] ?? accentMap.indigo
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+              <div
+                style={{
+                  width: 26,
+                  height: 26,
+                  background: accent.avatarBg,
+                  color: accent.avatarText,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                }}
+                aria-hidden
+              >
+                {audience.emoji}
+              </div>
+              <span
+                style={{
+                  fontFamily: FONT.grotesque,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: SX.ink,
+                  letterSpacing: '-0.005em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {audience.name}
+              </span>
+            </div>
+          )
+        })()}
+
+        {selected.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+            <div style={{ display: 'flex' }}>
+              {selected.slice(0, 4).map((audience, i) => {
+                const accent = accentMap[audience.accentColor] ?? accentMap.indigo
+                return (
+                  <div
+                    key={audience.id}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      background: accent.avatarBg,
+                      color: accent.avatarText,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 13,
+                      border: `2px solid ${SX.tint}`,
+                      marginLeft: i === 0 ? 0 : -6,
+                      zIndex: selected.length - i,
+                      position: 'relative',
+                    }}
+                    aria-hidden
+                  >
+                    {audience.emoji}
+                  </div>
+                )
+              })}
+            </div>
+            <Cap color={SX.ink} size={11}>
+              {selected.length} audiences
+            </Cap>
+          </div>
+        )}
+
+        <div style={{ width: 1, height: 22, background: SX.hair, flex: 'none' }} />
+
+        {/* Idea-type pill (accent border + caps) */}
+        <span
+          style={{
+            border: `1px solid ${SX.accent}`,
+            padding: '3px 8px',
+            fontFamily: FONT.grotesque,
+            fontSize: 9.5,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.14em',
+            color: SX.accent,
+            flex: 'none',
+          }}
+        >
+          {ideaTypeLabel(context.ideaType)}
+        </span>
+
+        {/* Idea text */}
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: FONT.grotesque,
+            fontSize: 13.5,
+            color: SX.ink,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {ideaText}
+        </span>
+
+        {/* Brief context tags (compact) */}
+        {contextTags.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
+            {contextTags.map((tag, i) => (
+              <span
+                key={i}
+                style={{
+                  border: `1px solid ${SX.hair}`,
+                  padding: '3px 8px',
+                  fontFamily: FONT.grotesque,
+                  fontSize: 11,
+                  color: SX.soft,
+                  whiteSpace: 'nowrap',
+                  maxWidth: 180,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+                title={tag}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Edit ghost */}
+        <BtnGhost onClick={onEdit} style={{ flex: 'none', padding: '6px 14px' }}>
+          Edit
+        </BtnGhost>
+      </div>
     </div>
   )
 }

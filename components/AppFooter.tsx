@@ -1,57 +1,85 @@
 'use client'
 
+import { SX, FONT, PAGE_W } from '@/lib/design/tokens'
+
 export default function AppFooter() {
   const year = new Date().getFullYear()
 
   return (
-    <footer style={{
-      borderTop: '1px solid var(--border-subtle)',
-      background: 'var(--surface)',
-    }}>
-      <div className="container-xl" style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: '20px',
-        paddingBottom: '20px',
-        gap: '16px',
-        flexWrap: 'wrap',
-      }}>
-
-        {/* Left — brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-            Synthetic<span style={{ color: 'var(--primary)' }}>.</span>
+    <footer
+      style={{
+        borderTop: `1px solid ${SX.hairSoft}`,
+        background: SX.paper,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: PAGE_W,
+          margin: '0 auto',
+          padding: '20px 48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              fontFamily: FONT.grotesque,
+              fontSize: 13,
+              fontWeight: 800,
+              color: SX.ink,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Synthetic<span style={{ color: SX.accent }}>.</span>
           </span>
-          <span style={{ width: '1px', height: '12px', background: 'var(--border-subtle)', display: 'inline-block' }} />
-          <span style={{ fontSize: '12px', color: 'var(--text-disabled)' }}>
-            © {year} B&amp;T Lab. All rights reserved.
+          <span
+            style={{
+              width: 1,
+              height: 12,
+              background: SX.hairSoft,
+              display: 'inline-block',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: FONT.grotesque,
+              fontSize: 10,
+              color: SX.faint,
+              textTransform: 'uppercase',
+              letterSpacing: '0.14em',
+            }}
+          >
+            © {year} B&amp;T Lab
           </span>
         </div>
 
-        {/* Right — links + note */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-{[
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          {[
             { label: 'Privacy', href: '#' },
-            { label: 'Terms',   href: '#' },
-          ].map(link => (
+            { label: 'Terms', href: '#' },
+          ].map((link) => (
             <a
               key={link.label}
               href={link.href}
+              className="sx-link"
               style={{
-                fontSize: '12px',
-                color: 'var(--text-disabled)',
+                fontFamily: FONT.grotesque,
+                fontSize: 10,
+                fontWeight: 700,
+                color: SX.faint,
+                textTransform: 'uppercase',
+                letterSpacing: '0.14em',
                 textDecoration: 'none',
-                transition: 'color 0.15s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-disabled)')}
             >
               {link.label}
             </a>
           ))}
         </div>
-
       </div>
     </footer>
   )

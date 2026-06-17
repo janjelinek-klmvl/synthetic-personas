@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { HistoryEntry, formatRelativeTime, ideaTypeLabel } from '@/lib/history'
-import { getPersonaById, accentMap } from '@/lib/personas'
+import { useAudiences, accentMap } from '@/lib/personas'
 import ReportSection from './ReportSection'
 
 interface Props {
@@ -11,21 +11,14 @@ interface Props {
 }
 
 export default function ReportDrawer({ entry, onClose }: Props) {
-  const [activePersonaId, setActivePersonaId] = useState<string | null>(null)
+  const { byId } = useAudiences()
 
-  // Reset active tab when entry changes
-  useEffect(() => {
-    setActivePersonaId(entry?.personaIds[0] ?? null)
-  }, [entry?.id])
-
-  // Escape key
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = entry ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -33,12 +26,12 @@ export default function ReportDrawer({ entry, onClose }: Props) {
 
   if (!entry) return null
 
-  const isMulti = entry.personaIds.length > 1
-  const firstPersona = getPersonaById(entry.personaIds[0])
+  const isMulti = entry.audience_ids.length > 1
+  const first = byId(entry.audience_ids[0])
+  const idea = entry.proposition_snapshot?.idea ?? ''
 
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -50,7 +43,6 @@ export default function ReportDrawer({ entry, onClose }: Props) {
         }}
       />
 
-      {/* Panel */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: 'min(760px, 100vw)',
@@ -61,7 +53,6 @@ export default function ReportDrawer({ entry, onClose }: Props) {
         animation: 'drawerSlideIn 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
       }}>
 
-        {/* Drawer header */}
         <div style={{
           padding: '20px 24px',
           borderBottom: '1px solid var(--border-subtle)',
@@ -69,44 +60,42 @@ export default function ReportDrawer({ entry, onClose }: Props) {
           flexShrink: 0,
           background: 'var(--surface)',
         }}>
-          {/* Avatar — single or stacked */}
           {isMulti ? (
             <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center' }}>
-              {entry.personaIds.slice(0, 4).map((pid, i) => {
-                const p = getPersonaById(pid)
-                const accent = accentMap[p?.accentColor ?? 'indigo'] ?? accentMap.indigo
+              {entry.audience_ids.slice(0, 4).map((aid, i) => {
+                const a = byId(aid)
+                const accent = accentMap[a?.accentColor ?? 'indigo'] ?? accentMap.indigo
                 return (
-                  <div key={pid} style={{
+                  <div key={aid} style={{
                     width: '36px', height: '36px', borderRadius: '10px',
                     background: accent.avatarBg, color: accent.avatarText,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '18px', border: '2px solid var(--surface)',
                     marginLeft: i === 0 ? 0 : '-8px',
-                    position: 'relative', zIndex: entry.personaIds.length - i,
+                    position: 'relative', zIndex: entry.audience_ids.length - i,
                   }}>
-                    {p?.emoji ?? '?'}
+                    {a?.emoji ?? '?'}
                   </div>
                 )
               })}
             </div>
-          ) : firstPersona ? (
+          ) : first ? (
             <div style={{
               width: '44px', height: '44px', borderRadius: '12px',
               background: 'var(--primary-light)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '22px', flexShrink: 0,
             }}>
-              {firstPersona.emoji}
+              {first.emoji}
             </div>
           ) : null}
 
-          {/* Meta */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {isMulti
-                  ? `${entry.personaIds.length} personas`
-                  : (firstPersona?.name ?? entry.personaIds[0])
+                  ? `${entry.audience_ids.length} audiences`
+                  : (first?.name ?? entry.audience_ids[0])
                 }
               </span>
               <span style={{
@@ -114,10 +103,10 @@ export default function ReportDrawer({ entry, onClose }: Props) {
                 textTransform: 'uppercase', padding: '2px 8px', borderRadius: '999px',
                 background: '#f0f0f0', color: '#666',
               }}>
-                {ideaTypeLabel(entry.ideaType)}
+                {ideaTypeLabel(entry.proposition_snapshot.idea_type)}
               </span>
               <span style={{ fontSize: '11px', color: 'var(--text-disabled)', marginLeft: 'auto' }}>
-                {formatRelativeTime(entry.createdAt)}
+                {formatRelativeTime(entry.created_at)}
               </span>
             </div>
             <p style={{
@@ -126,11 +115,10 @@ export default function ReportDrawer({ entry, onClose }: Props) {
               overflow: 'hidden', display: '-webkit-box',
               WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
             }}>
-              {entry.ideaText}
+              {idea}
             </p>
           </div>
 
-          {/* Close */}
           <button
             onClick={onClose}
             style={{
@@ -147,18 +135,8 @@ export default function ReportDrawer({ entry, onClose }: Props) {
           </button>
         </div>
 
-        {/* Scrollable report */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          <ReportSection
-            reports={entry.reports}
-            loading={false}
-            error={null}
-            disableScroll
-            activePersonaId={activePersonaId}
-            onTabChange={setActivePersonaId}
-            ideaText={entry.ideaText}
-            context={entry.context}
-          />
+          <ReportSection record={entry} loading={false} error={null} />
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { SX, FONT } from '@/lib/design/tokens'
+import Cap from '@/components/design/Cap'
 
 const MESSAGES = [
   'Reading your idea…',
@@ -17,82 +19,51 @@ export default function BriefLoadingState() {
     const interval = setInterval(() => {
       setVisible(false)
       setTimeout(() => {
-        setMsgIndex(i => (i + 1) % MESSAGES.length)
+        setMsgIndex((i) => (i + 1) % MESSAGES.length)
         setVisible(true)
       }, 200)
-    }, 1400)
+    }, 1600)
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <style>{`
-        @keyframes scanLine {
-          0%   { transform: translateY(0px);   opacity: 0; }
-          10%  { opacity: 1; }
-          90%  { opacity: 1; }
-          100% { transform: translateY(40px);  opacity: 0; }
-        }
-        @keyframes briefFade {
-          from { opacity: 0; transform: translateY(4px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0.45; }
-        }
-      `}</style>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <Cap color={SX.accent} size={11}>
+        Sharpening the brief
+      </Cap>
 
-      {/* Icon + message */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <span className="sx-pulse" style={{ display: 'inline-flex', gap: 4 }}>
+          <span />
+          <span />
+          <span />
+        </span>
 
-        {/* Document scanner icon */}
-        <div style={{ position: 'relative', width: '36px', height: '44px', flexShrink: 0 }}>
-          <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Document body */}
-            <rect x="2" y="2" width="32" height="40" rx="4" fill="#f5f5f5" stroke="#e0e0e0" strokeWidth="1.5" />
-            {/* Text lines */}
-            <rect x="8" y="12" width="20" height="2.5" rx="1.25" fill="#d0d0d0" />
-            <rect x="8" y="19" width="16" height="2.5" rx="1.25" fill="#d0d0d0" />
-            <rect x="8" y="26" width="20" height="2.5" rx="1.25" fill="#d0d0d0" />
-            <rect x="8" y="33" width="12" height="2.5" rx="1.25" fill="#d0d0d0" />
-            {/* Scanning highlight bar */}
-            <rect
-              x="2" y="10" width="32" height="6" rx="2"
-              fill="url(#scanGrad)"
-              style={{ animation: 'scanLine 1.6s ease-in-out infinite' }}
-            />
-            <defs>
-              <linearGradient id="scanGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="#1a1a1a" stopOpacity="0" />
-                <stop offset="40%"  stopColor="#1a1a1a" stopOpacity="0.08" />
-                <stop offset="100%" stopColor="#1a1a1a" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-
-        {/* Cycling text */}
-        <div style={{ minHeight: '24px', display: 'flex', alignItems: 'center' }}>
-          <span
-            key={msgIndex}
-            style={{
-              fontSize: '15px',
-              color: '#555',
-              fontWeight: 450,
-              animation: visible ? 'briefFade 0.25s ease-out forwards' : 'none',
-              opacity: visible ? undefined : 0,
-            }}
-          >
-            {MESSAGES[msgIndex]}
-          </span>
-        </div>
+        <span
+          key={msgIndex}
+          style={{
+            fontFamily: FONT.grotesque,
+            fontSize: 15,
+            fontWeight: 600,
+            color: SX.ink,
+            letterSpacing: '-0.005em',
+            transition: 'opacity 200ms',
+            opacity: visible ? 1 : 0,
+          }}
+        >
+          {MESSAGES[msgIndex]}
+        </span>
       </div>
 
-      {/* Skeleton placeholders mimicking question UI */}
-      <div style={{ height: '3px', background: '#f0f0f0', borderRadius: '9999px' }} />
-      <div style={{ height: '22px', background: '#f0f0f0', borderRadius: '8px', width: '65%', animation: 'pulse 1.6s ease-in-out infinite' }} />
-      <div style={{ height: '52px', background: '#f0f0f0', borderRadius: '12px', animation: 'pulse 1.6s ease-in-out infinite 0.3s' }} />
+      {/* Indeterminate sliding bar */}
+      <div className="sx-loadbar" aria-hidden>
+        <div className="sx-loadbar-fill" />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ height: 22, background: SX.hairSoft, width: '65%' }} />
+        <div style={{ height: 52, background: SX.hairSoft }} />
+      </div>
     </div>
   )
 }

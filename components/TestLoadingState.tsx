@@ -1,15 +1,26 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { personas, accentMap } from '@/lib/personas'
+import { useAudiences, accentMap } from '@/lib/personas'
+import { SX, FONT, TNUM } from '@/lib/design/tokens'
+import Cap from '@/components/design/Cap'
 
-const ACCENT_COLORS: Record<string, { bg: string; text: string; ring: string }> = {
-  amber:  { bg: '#FFF3D6', text: '#8A6200', ring: '#F5C842' },
-  violet: { bg: '#E8DEFF', text: '#6B3ECC', ring: '#9B72EF' },
-  cyan:   { bg: '#D6E4FD', text: '#2E63E0', ring: '#60A5FA' },
-  green:  { bg: '#D4EDD4', text: '#2A6A2A', ring: '#6DBF6D' },
-  indigo: { bg: '#D9DCFF', text: '#3D52C4', ring: '#7B8EE8' },
-  rose:   { bg: '#FFD6E0', text: '#C4335A', ring: '#F472A8' },
+// Phase timing is approximate — AS only emits `loading`/`evaluating` on the
+// real run, so we fake a progression. Durations roughly mirror real cost of
+// each pipeline stage (coding open responses is the slowest because it makes
+// one Claude call per respondent). Multi-audience runs scale linearly.
+const PHASES: Array<{ label: string; ms: number }> = [
+  { label: 'Synthesising respondents…', ms: 6000 },
+  { label: 'Presenting the stimulus', ms: 12000 },
+  { label: 'Coding open responses', ms: 45000 }, // slowest stage
+  { label: 'Scoring the signals', ms: 25000 },
+  { label: 'Writing the debrief', ms: 12000 },
+]
+
+interface Props {
+  personaIds: string[]
+  respondentCount: number
+  audienceCount?: number
 }
 
 function getInitials(name: string): string {
@@ -17,165 +28,248 @@ function getInitials(name: string): string {
     .split(/[\s-]+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map(w => w[0].toUpperCase())
+    .map((w) => w[0].toUpperCase())
     .join('')
 }
 
-function buildMessages(count: number): string[] {
-  return [
-    'Assembling your panel…',
-    `Briefing ${count} ${count === 1 ? 'persona' : 'personas'}…`,
-    'Running qualitative analysis…',
-    'Crunching the numbers…',
-    'Synthesising reactions…',
-    'Compiling insights…',
-  ]
-}
+// Open-ended run loading screen. Five fake phases on a timer + a respondent
+// grid that fills progressively. No completion CTA — the report opens on its
+// own when polling sees the terminal status.
+export default function TestLoadingState({ personaIds, respondentCount, audienceCount = 1 }: Props) {
+  const { byId } = useAudiences()
+  const [phase, setPhase] = useState(0)
+  const [responded, setResponded] = useState<number>(0)
 
-interface Props {
-  personaIds: string[]
-}
-
-export default function TestLoadingState({ personaIds }: Props) {
-  const [msgIndex, setMsgIndex] = useState(0)
-  const [visible, setVisible] = useState(true)
-  const messages = buildMessages(personaIds.length)
-
+  // Phase advancement — each phase has its own duration. Multi-audience runs
+  // scale all timings linearly because AS runs them sequentially per audience.
+  const scale = Math.max(1, audienceCount)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setVisible(false)
-      setTimeout(() => {
-        setMsgIndex(i => (i + 1) % messages.length)
-        setVisible(true)
-      }, 200)
-    }, 1800)
-    return () => clearInterval(interval)
-  }, [messages.length])
+    if (phase >= PHASES.length - 1) return
+    const t = setTimeout(
+      () => setPhase((p) => Math.min(p + 1, PHASES.length - 1)),
+      PHASES[phase].ms * scale,
+    )
+    return () => clearTimeout(t)
+  }, [phase, scale])
 
-  const panelPersonas = personaIds.map(id => {
-    const p = personas.find(x => x.id === id)
-    return {
-      id,
-      initials: p ? getInitials(p.name) : id.slice(0, 2).toUpperCase(),
-      colors: p ? (ACCENT_COLORS[p.accentColor] ?? ACCENT_COLORS.indigo) : ACCENT_COLORS.indigo,
-    }
+  // Respondent grid is exactly the count the user picked (6/12/18/24 × audiences).
+  const N_RESPONDENTS = Math.max(1, respondentCount * Math.max(1, audienceCount))
+  // Pace respondent fill so it spans the "Coding open responses" phase roughly:
+  // total fill time ~ phase 3 duration. So each respondent takes phase3.ms/N.
+  const fillIntervalMs = Math.max(1200, (PHASES[2].ms * scale) / N_RESPONDENTS)
+  useEffect(() => {
+    if (responded >= N_RESPONDENTS) return
+    const t = setTimeout(() => setResponded((r) => Math.min(r + 1, N_RESPONDENTS)), fillIntervalMs)
+    return () => clearTimeout(t)
+  }, [responded, N_RESPONDENTS])
+
+  const personaAccents = personaIds.map((id) => {
+    const a = byId(id)
+    if (!a) return accentMap.indigo
+    return accentMap[a.accentColor] ?? accentMap.indigo
   })
 
   return (
-    <div style={{ marginBottom: '32px' }}>
-      <style>{`
-        @keyframes panelPulse {
-          0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(0,0,0,0); }
-          50%       { transform: scale(1.08); box-shadow: 0 0 0 5px var(--ring-color); }
-        }
-        @keyframes testFade {
-          from { opacity: 0; transform: translateY(4px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes dotBounce {
-          0%, 80%, 100% { transform: translateY(0);   opacity: 0.3; }
-          40%           { transform: translateY(-4px); opacity: 1; }
-        }
-        @keyframes connectorPulse {
-          0%, 100% { opacity: 0.2; }
-          50%       { opacity: 0.5; }
-        }
-      `}</style>
+    <div
+      style={{
+        maxWidth: 820,
+        margin: '0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 32,
+        padding: '24px 0 16px',
+      }}
+    >
+      {/* Header: pulse + caps */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <span className="sx-pulse" style={{ display: 'inline-flex', gap: 4 }}>
+          <span />
+          <span />
+          <span />
+        </span>
+        <Cap color={SX.ink} size={11}>
+          Test in progress
+        </Cap>
+      </div>
 
-      {/* Panel row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '20px', position: 'relative' }}>
-        {panelPersonas.map((p, i) => (
-          <div key={p.id} style={{ display: 'flex', alignItems: 'center' }}>
-            {/* Connector line between avatars */}
-            {i > 0 && (
-              <div style={{
-                width: '24px', height: '2px',
-                background: 'linear-gradient(90deg, #e0e0e0, #d0d0d0)',
-                animation: 'connectorPulse 1.8s ease-in-out infinite',
-                animationDelay: `${i * 0.2}s`,
-              }} />
-            )}
-            {/* Avatar circle */}
-            <div
-              style={{
-                width: '44px', height: '44px', borderRadius: '50%',
-                background: p.colors.bg,
-                color: p.colors.text,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '13px', fontWeight: 600, letterSpacing: '0.02em',
-                border: `2px solid ${p.colors.ring}`,
-                // @ts-expect-error CSS custom property
-                '--ring-color': p.colors.ring + '40',
-                animation: `panelPulse 2s ease-in-out infinite`,
-                animationDelay: `${i * 0.3}s`,
-                flexShrink: 0,
-                userSelect: 'none',
-              }}
-            >
-              {p.initials}
-            </div>
+      <h2
+        style={{
+          fontFamily: FONT.grotesque,
+          fontSize: 'clamp(28px, 4vw, 38px)',
+          fontWeight: 800,
+          color: SX.ink,
+          letterSpacing: '-0.025em',
+          lineHeight: 1.1,
+          margin: 0,
+          textWrap: 'balance',
+        }}
+      >
+        Putting it to {respondentCount} synthetic respondents
+        {audienceCount > 1 ? ` × ${audienceCount} audiences` : ''}.
+      </h2>
+
+      <p
+        style={{
+          fontFamily: FONT.grotesque,
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: SX.soft,
+          margin: 0,
+          maxWidth: 540,
+        }}
+      >
+        Each respondent reads your stimulus, answers in their own voice, and gets coded into the
+        signals you picked. This takes a minute or two.
+      </p>
+
+      {/* Phase block */}
+      <div style={{ marginTop: 8 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 10,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT.grotesque,
+              fontSize: 17,
+              fontWeight: 700,
+              color: SX.ink,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {PHASES[phase].label}
           </div>
-        ))}
+          <Cap color={SX.faint} size={10} style={{ ...TNUM }}>
+            Phase {String(phase + 1).padStart(2, '0')} / {String(PHASES.length).padStart(2, '0')}
+          </Cap>
+        </div>
 
-        {/* "Thinking" dots floating above last avatar — just visual flair */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '12px', marginBottom: '2px' }}>
-          {[0, 1, 2].map(d => (
-            <div
-              key={d}
-              style={{
-                width: '5px', height: '5px', borderRadius: '50%',
-                background: '#bbb',
-                animation: 'dotBounce 1.2s ease-in-out infinite',
-                animationDelay: `${d * 0.2}s`,
-              }}
-            />
-          ))}
+        <div className="sx-loadbar" aria-hidden>
+          <div className="sx-loadbar-fill" />
+        </div>
+
+        {/* Stepper */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+          {PHASES.map((p, i) => {
+            const done = i < phase
+            const cur = i === phase
+            return (
+              <div
+                key={p.label}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: FONT.grotesque,
+                  fontSize: 11,
+                  fontWeight: cur ? 700 : 500,
+                  color: done ? SX.accent : cur ? SX.ink : SX.faint,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: done || cur ? SX.accent : SX.hair,
+                  }}
+                />
+                {done ? <span style={{ color: SX.accent }}>✓</span> : null}
+                {p.label}
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* Analysis tags */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['Qualitative', 'Quantitative'].map((label, i) => (
-          <div
-            key={label}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '12px', color: '#999', fontWeight: 500,
-              background: '#f7f7f7', borderRadius: '20px',
-              padding: '4px 10px',
-            }}
-          >
-            {label}
-            <div style={{ display: 'flex', gap: '3px' }}>
-              {[0, 1, 2].map(d => (
-                <div
-                  key={d}
-                  style={{
-                    width: '4px', height: '4px', borderRadius: '50%',
-                    background: '#ccc',
-                    animation: 'dotBounce 1.4s ease-in-out infinite',
-                    animationDelay: `${i * 0.4 + d * 0.18}s`,
-                  }}
-                />
-              ))}
+      {/* Respondent grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+          gap: 8,
+        }}
+      >
+        {Array.from({ length: N_RESPONDENTS }).map((_, i) => {
+          const accent = personaAccents[i % Math.max(1, personaAccents.length)]
+          const done = i < responded
+          return (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 12px',
+                border: `1px solid ${done ? SX.accent : SX.hair}`,
+                background: done ? SX.tint : 'transparent',
+                transition: 'border-color 220ms, background 220ms',
+              }}
+            >
+              <span
+                style={{
+                  width: 22,
+                  height: 22,
+                  background: accent.avatarBg,
+                  color: accent.avatarText,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  fontFamily: FONT.grotesque,
+                }}
+                aria-hidden
+              >
+                {getInitials(`R${i + 1}`)}
+              </span>
+              <span
+                style={{
+                  fontFamily: FONT.grotesque,
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  color: done ? SX.accent : SX.faint,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  flex: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {done ? '✓ Responded' : 'Thinking…'}
+              </span>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* Cycling message */}
-      <div style={{ minHeight: '22px' }}>
-        <span
-          key={msgIndex}
-          style={{
-            fontSize: '14px',
-            color: 'var(--text-secondary)',
-            animation: visible ? 'testFade 0.25s ease-out forwards' : 'none',
-            opacity: visible ? undefined : 0,
-          }}
-        >
-          {messages[msgIndex]}
-        </span>
+      {/* Closing reassurance */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '14px 0 4px',
+          borderTop: `1px solid ${SX.hairSoft}`,
+        }}
+      >
+        <svg className="sx-spin" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+          <circle cx="7" cy="7" r="5.5" stroke={SX.hair} strokeWidth="1.5" fill="none" />
+          <path d="M12.5 7a5.5 5.5 0 0 0-5.5-5.5" stroke={SX.accent} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        </svg>
+        <Cap color={SX.soft} size={10}>
+          The reception report opens on its own when the run finishes — you can leave this open.
+        </Cap>
       </div>
     </div>
   )
