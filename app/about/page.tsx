@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import AppHeader from '@/components/AppHeader'
 import Cap from '@/components/design/Cap'
 import Glyphs from '@/components/design/Glyphs'
-import { SX, FONT, PAGE_W, TNUM } from '@/lib/design/tokens'
+import { SX, FONT, PAGE_W } from '@/lib/design/tokens'
 
 export const metadata: Metadata = {
   title: 'About — Synthetic',
@@ -16,18 +16,32 @@ const DEBRIEF = [
   {
     term: 'Verdict',
     body: 'Where the idea lands, in plain language.',
+    img: '/about-report/verdict.png',
+    alt: 'A Reception Debrief verdict: a 70-out-of-100 “Works” score, the headline “Identity door opens, trust floor missing,” and a radar of the scored dimensions.',
   },
   {
     term: 'Signals',
     body: 'The specific reactions behind that verdict — the strong and the weak.',
+    img: '/about-report/signals.png',
+    alt: 'The Signals chapter: every dimension scored on a 0–100 reception scale with meters, grouped by how it landed.',
   },
   {
     term: 'Evidence',
     body: 'Every signal traced to its source: which research, which data, which voice.',
+    img: '/about-report/evidence.png',
+    alt: 'The Evidence chapter: a coded theme shown with the respondents’ own words and the sources it affects.',
   },
   {
     term: 'Moves',
     body: 'What to do next: what to sharpen, what to drop.',
+    img: '/about-report/moves.png',
+    alt: 'The Moves chapter: three recommended moves, in order, each grounded in cited evidence.',
+  },
+  {
+    term: 'Interrogate',
+    body: 'You can interrogate any verdict by chat — ask why, and get an answer drawn from the same sources.',
+    img: '/about-report/interrogate.png',
+    alt: 'A chat box to interrogate the run — ask the report or the audience any question.',
   },
 ]
 
@@ -108,53 +122,47 @@ export default function AboutPage() {
             built from real research and data.
           </p>
           <p style={{ ...proseStyle, marginTop: 20 }}>
-            Each run produces a <strong style={{ color: SX.ink, fontWeight: 700 }}>Reception Debrief</strong>:
+            Each run produces a <strong style={{ color: SX.ink, fontWeight: 700 }}>Reception Debrief</strong> —
+            here&apos;s one, chapter by chapter:
           </p>
+        </Section>
 
-          <div style={{ marginTop: 44, maxWidth: READ_W }}>
-            {DEBRIEF.map((item, i) => (
-              <div
-                key={item.term}
-                style={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  padding: '44px 0',
-                  borderTop: i === 0 ? `2px solid ${SX.ink}` : `1px solid ${SX.hair}`,
-                }}
-              >
-                {/* Giant ghost index — echoes the report's chapter scaffold. */}
-                <span
-                  aria-hidden
-                  style={{
-                    position: 'absolute',
-                    right: -6,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    fontFamily: FONT.grotesque,
-                    fontWeight: 800,
-                    fontSize: 168,
-                    lineHeight: 0.7,
-                    letterSpacing: '-0.06em',
-                    color: SX.ghost,
-                    zIndex: 0,
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    ...TNUM,
-                  }}
-                >
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-
-                <div style={{ position: 'relative', zIndex: 1, maxWidth: 500 }}>
+        {/* ─── Reception Debrief — wide showcase band with real report fragments ── */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              .abt-dbf-grid { display: grid; grid-template-columns: 0.88fr 1.12fr; gap: 56px; align-items: center; }
+              .abt-dbf-grid.flip { grid-template-columns: 1.12fr 0.88fr; }
+              .abt-dbf-grid.flip .abt-dbf-text { order: 2; }
+              .abt-dbf-grid.flip .abt-dbf-media { order: 1; }
+              @media (max-width: 880px) {
+                .abt-dbf-grid, .abt-dbf-grid.flip { grid-template-columns: 1fr; gap: 26px; }
+                .abt-dbf-grid.flip .abt-dbf-text { order: 0; }
+                .abt-dbf-grid.flip .abt-dbf-media { order: 1; }
+              }
+            `,
+          }}
+        />
+        <div style={{ marginTop: 40 }}>
+          {DEBRIEF.map((item, i) => (
+            <div
+              key={item.term}
+              style={{
+                padding: '56px 0',
+                borderTop: i === 0 ? `2px solid ${SX.ink}` : `1px solid ${SX.hair}`,
+              }}
+            >
+              <div className={`abt-dbf-grid${i % 2 === 1 ? ' flip' : ''}`}>
+                <div className="abt-dbf-text">
                   <Cap color={SX.accent} size={11}>
-                    {`0${i + 1} / 04`}
+                    {`0${i + 1} / 0${DEBRIEF.length}`}
                   </Cap>
                   <h3
                     style={{
                       margin: '14px 0 0',
                       fontFamily: FONT.grotesque,
                       fontWeight: 800,
-                      fontSize: 'clamp(32px, 4.6vw, 46px)',
+                      fontSize: 'clamp(34px, 4.6vw, 50px)',
                       lineHeight: 0.98,
                       letterSpacing: '-0.04em',
                       color: SX.ink,
@@ -162,29 +170,41 @@ export default function AboutPage() {
                   >
                     {item.term}
                   </h3>
-                  <div style={{ width: 40, height: 2, background: SX.accent, margin: '18px 0' }} />
+                  <div style={{ width: 44, height: 2, background: SX.accent, margin: '20px 0' }} />
                   <p
                     style={{
                       margin: 0,
                       fontFamily: FONT.grotesque,
-                      fontSize: 16.5,
+                      fontSize: 17,
                       lineHeight: 1.55,
                       color: SX.soft,
-                      maxWidth: 440,
+                      maxWidth: 420,
                     }}
                   >
                     {item.body}
                   </p>
                 </div>
-              </div>
-            ))}
-          </div>
 
-          <p style={{ ...proseStyle, marginTop: 28 }}>
-            You can interrogate any verdict by chat — ask why, and get an answer drawn from the same
-            sources.
-          </p>
-        </Section>
+                <figure className="abt-dbf-media" style={{ margin: 0 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.img}
+                    alt={item.alt}
+                    loading="lazy"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      height: 'auto',
+                      border: `1px solid ${SX.hair}`,
+                      background: SX.paper,
+                      boxShadow: '0 20px 44px rgba(26,23,20,0.10)',
+                    }}
+                  />
+                </figure>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* ─── What an audience is ──────────────────────────── */}
         <Section kicker="What an audience is">
