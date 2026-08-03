@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import AppHeader from '@/components/AppHeader'
 import Cap from '@/components/design/Cap'
 import Glyphs from '@/components/design/Glyphs'
-import { SX, FONT, PAGE_W } from '@/lib/design/tokens'
+import { SX, FONT, PAGE_W, TNUM } from '@/lib/design/tokens'
 
 export const metadata: Metadata = {
   title: 'About — Synthetic',
@@ -111,59 +111,71 @@ export default function AboutPage() {
             Each run produces a <strong style={{ color: SX.ink, fontWeight: 700 }}>Reception Debrief</strong>:
           </p>
 
-          <div
-            style={{
-              marginTop: 28,
-              border: `1px solid ${SX.hair}`,
-              maxWidth: READ_W,
-            }}
-          >
+          <div style={{ marginTop: 44, maxWidth: READ_W }}>
             {DEBRIEF.map((item, i) => (
               <div
                 key={item.term}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '160px 1fr',
-                  gap: 20,
-                  alignItems: 'baseline',
-                  padding: '22px 26px',
-                  borderBottom: i === DEBRIEF.length - 1 ? 'none' : `1px solid ${SX.hair}`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  padding: '44px 0',
+                  borderTop: i === 0 ? `2px solid ${SX.ink}` : `1px solid ${SX.hair}`,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                  <span
+                {/* Giant ghost index — echoes the report's chapter scaffold. */}
+                <span
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    right: -6,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontFamily: FONT.grotesque,
+                    fontWeight: 800,
+                    fontSize: 168,
+                    lineHeight: 0.7,
+                    letterSpacing: '-0.06em',
+                    color: SX.ghost,
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    ...TNUM,
+                  }}
+                >
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+
+                <div style={{ position: 'relative', zIndex: 1, maxWidth: 500 }}>
+                  <Cap color={SX.accent} size={11}>
+                    {`0${i + 1} / 04`}
+                  </Cap>
+                  <h3
                     style={{
+                      margin: '14px 0 0',
                       fontFamily: FONT.grotesque,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: SX.faint,
-                    }}
-                  >
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: FONT.grotesque,
-                      fontSize: 16,
                       fontWeight: 800,
-                      letterSpacing: '-0.01em',
+                      fontSize: 'clamp(32px, 4.6vw, 46px)',
+                      lineHeight: 0.98,
+                      letterSpacing: '-0.04em',
                       color: SX.ink,
                     }}
                   >
                     {item.term}
-                  </span>
+                  </h3>
+                  <div style={{ width: 40, height: 2, background: SX.accent, margin: '18px 0' }} />
+                  <p
+                    style={{
+                      margin: 0,
+                      fontFamily: FONT.grotesque,
+                      fontSize: 16.5,
+                      lineHeight: 1.55,
+                      color: SX.soft,
+                      maxWidth: 440,
+                    }}
+                  >
+                    {item.body}
+                  </p>
                 </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: FONT.grotesque,
-                    fontSize: 15,
-                    lineHeight: 1.5,
-                    color: SX.soft,
-                  }}
-                >
-                  {item.body}
-                </p>
               </div>
             ))}
           </div>
