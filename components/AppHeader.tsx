@@ -84,6 +84,7 @@ export default function AppHeader() {
   const onTest = pathname === '/'
   const onPersonas = pathname === '/personas'
   const onHistory = pathname === '/history'
+  const onAbout = pathname === '/about'
   const onPricing = pathname === '/credits' || pathname === '/pricing'
 
   async function handleSignOut() {
@@ -142,6 +143,9 @@ export default function AppHeader() {
           </NavLink>
           <NavLink href="/history" active={onHistory} badge={count > 0 ? count : undefined}>
             History
+          </NavLink>
+          <NavLink href="/about" active={onAbout}>
+            About
           </NavLink>
         </nav>
 
