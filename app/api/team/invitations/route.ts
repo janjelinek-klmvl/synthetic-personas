@@ -7,9 +7,20 @@ function makeToken(): string {
   return randomBytes(24).toString('base64url')
 }
 
-function inviteUrl(token: string): string {
-  const base = (process.env.NEXT_PUBLIC_SP_BASE_URL ?? 'http://localhost:3000').replace(/\/+$/, '')
-  return `${base}/accept-invite/${token}`
+// /accept-invite lives in this app, so the origin the admin is using is the
+// right base: it stays correct on preview deployments and custom domains.
+// NEXT_PUBLIC_SP_BASE_URL still wins when set, for the canonical domain.
+function inviteUrl(token: string, request: NextRequest): string {
+  const configured = process.env.NEXT_PUBLIC_SP_BASE_URL?.trim()
+  const base = configured || requestOrigin(request)
+  return `${base.replace(/\/+$/, '')}/accept-invite/${token}`
+}
+
+function requestOrigin(request: NextRequest): string {
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+  if (!host) return new URL(request.url).origin
+  const proto = request.headers.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
+  return `${proto}://${host}`
 }
 
 async function requireAdmin() {
@@ -26,7 +37,7 @@ function handleAuthError(e: unknown) {
   return null
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { ctx, error } = await requireAdmin()
     if (error) return error
@@ -35,7 +46,7 @@ export async function GET() {
       .select('id, email, role, token, expires_at, accepted_at, created_at')
       .eq('company_id', ctx.companyId)
       .order('created_at', { ascending: false })
-    const rows = (data ?? []).map((r) => ({ ...r, url: inviteUrl(r.token) }))
+    const rows = (data ?? []).map((r) => ({ ...r, url: inviteUrl(r.token, request) }))
     return NextResponse.json({ invitations: rows })
   } catch (e) {
     const err = handleAuthError(e)
@@ -73,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { invitation: { ...data, url: inviteUrl(data.token) } },
+      { invitation: { ...data, url: inviteUrl(data.token, request) } },
       { status: 201 },
     )
   } catch (e) {

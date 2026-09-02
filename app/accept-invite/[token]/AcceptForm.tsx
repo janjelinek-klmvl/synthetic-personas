@@ -30,6 +30,10 @@ export default function AcceptForm({ token, email, kind }: Props) {
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
+      // Pin the confirmation link to the origin the invite was opened on. Without
+      // it Supabase falls back to the project's Site URL, which is how invited
+      // users end up on a localhost link.
+      options: { emailRedirectTo: `${window.location.origin}/login` },
     })
 
     if (signUpError && /already|registered/i.test(signUpError.message)) {
