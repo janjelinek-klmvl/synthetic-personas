@@ -10,6 +10,15 @@ interface Props {
   kind: 'company' | 'bnt'
 }
 
+const ERRORS: Record<string, string> = {
+  EXISTING_ACCOUNT_WRONG_PASSWORD:
+    'An account already exists for this email. Enter its existing password to accept the invite.',
+  INVITE_ALREADY_ACCEPTED: 'This invitation has already been used.',
+  INVITE_EXPIRED: 'This invitation has expired. Ask your admin for a new one.',
+  INVITE_NOT_FOUND: 'This invitation link is not valid.',
+  PASSWORD_TOO_SHORT: 'Password must be at least 8 characters.',
+}
+
 export default function AcceptForm({ token, email, kind }: Props) {
   const router = useRouter()
   const [displayName, setDisplayName] = useState('')
@@ -22,56 +31,26 @@ export default function AcceptForm({ token, email, kind }: Props) {
     setError('')
     setLoading(true)
 
-    const supabase = supabaseBrowser()
-
-    // Try sign up first. If an auth.users row already exists for this email
-    // (e.g. user signed up elsewhere), fall back to signing in.
-    let userId: string | null = null
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      // Pin the confirmation link to the origin the invite was opened on. Without
-      // it Supabase falls back to the project's Site URL, which is how invited
-      // users end up on a localhost link.
-      options: { emailRedirectTo: `${window.location.origin}/login` },
-    })
-
-    if (signUpError && /already|registered/i.test(signUpError.message)) {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (signInError) {
-        setError(
-          'An account exists for this email but the password is wrong. Use your existing password.',
-        )
-        setLoading(false)
-        return
-      }
-      userId = signInData.user?.id ?? null
-    } else if (signUpError) {
-      setError(signUpError.message)
-      setLoading(false)
-      return
-    } else {
-      userId = signUpData.user?.id ?? null
-    }
-
-    if (!userId) {
-      setError('Could not establish a session. Please try again.')
-      setLoading(false)
-      return
-    }
-
+    // The account is created server-side by this endpoint (service key), so
+    // onboarding doesn't depend on public sign-ups being enabled and no
+    // confirmation email is ever sent. Then we sign in with the same password.
     const res = await fetch(`/api/accept-invite/${token}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ display_name: displayName.trim() }),
+      body: JSON.stringify({ display_name: displayName.trim(), password }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      setError(body?.error ?? `accept failed: ${res.status}`)
+      setError(ERRORS[body?.error as string] ?? body?.error ?? `accept failed: ${res.status}`)
       setLoading(false)
+      return
+    }
+
+    const supabase = supabaseBrowser()
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) {
+      // The account exists and the invite is accepted; only the session failed.
+      router.push('/login')
       return
     }
 
