@@ -5,6 +5,10 @@ import { createServerClient } from '@supabase/ssr'
 function isPublic(pathname: string): boolean {
   if (pathname === '/login') return true
   if (pathname.startsWith('/accept-invite/')) return true
+  // Password-recovery landing. The recovery token lives in the URL hash, so
+  // the server can't see a session here — gating it would bounce the user to
+  // /login before the client can read the token.
+  if (pathname === '/update-password') return true
   if (pathname.startsWith('/api/accept-invite/')) return true
   if (pathname.startsWith('/_next')) return true
   if (pathname.startsWith('/favicon')) return true

@@ -17,11 +17,13 @@ function LoginInner() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setNotice('')
     setLoading(true)
     const supabase = supabaseBrowser()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -32,6 +34,26 @@ function LoginInner() {
     }
     router.push(next)
     router.refresh()
+  }
+
+  async function handleForgotPassword() {
+    setError('')
+    setNotice('')
+    if (!email) {
+      setError('Enter your email first, then click "Forgot password?".')
+      return
+    }
+    const supabase = supabaseBrowser()
+    // Pin the link to this origin; without redirectTo Supabase falls back to
+    // the project's Site URL.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    })
+    if (error) {
+      setError(error.message)
+      return
+    }
+    setNotice('Check your email for a link to reset your password.')
   }
 
   return (
@@ -122,9 +144,33 @@ function LoginInner() {
             </Cap>
           )}
 
+          {notice && (
+            <Cap color={SX.soft} size={10}>
+              {notice}
+            </Cap>
+          )}
+
           <BtnPrimary type="submit" disabled={loading} style={{ width: '100%', marginTop: 8 }}>
             {loading ? 'Signing in…' : 'Sign in →'}
           </BtnPrimary>
+
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            style={{
+              alignSelf: 'center',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              fontFamily: FONT.grotesque,
+              fontSize: 12,
+              color: SX.soft,
+              textDecoration: 'underline',
+            }}
+          >
+            Forgot password?
+          </button>
         </form>
       </div>
     </div>
